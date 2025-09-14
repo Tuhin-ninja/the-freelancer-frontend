@@ -25,6 +25,12 @@ export const jobAPI = {
     const response = await api.get(`/api/jobs/client/${clientId}`);
     return response.data;
   },
+  
+  // Get jobs posted by the current logged-in user
+  getMyJobs: async (): Promise<Job[]> => {
+    const response = await api.get('/api/jobs/my-jobs');
+    return response.data;
+  },
 
   // Search jobs
   searchJobs: async (params: {

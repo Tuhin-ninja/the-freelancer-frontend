@@ -58,36 +58,6 @@ const UserSearchModal: React.FC<UserSearchModalProps> = ({
       setLoading(true);
       console.log('searching for:', searchQuery);
       
-      // Temporarily disable search - create mock users for testing
-      const mockUsers: User[] = [
-        {
-          id: 1,
-          email: 'test1@example.com',
-          name: 'Test User 1',
-          role: 'freelancer',
-          handle: 'testuser1',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          id: 4,
-          email: 'test4@example.com', 
-          name: 'Test User 4',
-          role: 'client',
-          handle: 'testuser4',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
-      
-    //   const results = mockUsers.filter(user => 
-    //     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    //     user.handle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    //     user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    //   );
-      
       const results = await ChatService.searchUsers(searchQuery.trim());
       setSearchResults(results);
     } catch (error) {

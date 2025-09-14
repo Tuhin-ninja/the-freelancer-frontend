@@ -105,6 +105,7 @@ export interface Job {
     name: string;
     email?: string;
   };
+  proposalCount?: number;
   createdAt: Date;
   created_at?: Date;
   updatedAt: Date;

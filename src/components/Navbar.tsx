@@ -27,6 +27,7 @@ const Navbar = () => {
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
     dispatch(logout());
     router.push('/');
   };

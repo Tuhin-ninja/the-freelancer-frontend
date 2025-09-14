@@ -1,12 +1,35 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MapPin, DollarSign, Calendar } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Search, Filter, MapPin, DollarSign, Calendar, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import JobList from '@/components/JobList';
 import jobService from '@/services/job';
 import { Job } from '@/types/api';
+import { useAppSelector } from '@/store/hooks';
+
+// Button component for clients to post a job
+const ClientPostJobButton = () => {
+  const router = useRouter();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  
+  // Only show the button if user is authenticated and is a client
+  if (!isAuthenticated || user?.role !== 'client') {
+    return null;
+  }
+  
+  return (
+    <Button 
+      className="bg-blue-600 hover:bg-blue-700 text-white"
+      onClick={() => router.push('/jobs/post')}
+    >
+      <Plus className="mr-2 h-4 w-4" />
+      Post a Job
+    </Button>
+  );
+};
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -129,6 +152,11 @@ export default function JobsPage() {
                 </Button>
               </div>
             </form>
+            
+            {/* Post Job Button for Hero Section */}
+            <div className="mt-6">
+              <ClientPostJobButton />
+            </div>
           </div>
         </div>
       </section>
@@ -198,6 +226,9 @@ export default function JobsPage() {
                   {filteredJobs.length} job{filteredJobs.length !== 1 ? 's' : ''} found
                 </p>
               </div>
+              
+              {/* Post Job Button for clients only */}
+              <ClientPostJobButton />
             </div>
 
             {/* Job List */}

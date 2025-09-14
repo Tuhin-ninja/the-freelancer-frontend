@@ -40,9 +40,11 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
       });
   dispatch(loginSuccess(res.data));
-  // Store tokens for authenticated requests
+  // Store tokens and user data for authenticated requests
   localStorage.setItem('accessToken', res.data.accessToken);
   localStorage.setItem('refreshToken', res.data.refreshToken);
+  localStorage.setItem('user', JSON.stringify(res.data.user));
+  console.log('User logged in:', res.data.user);
   router.push('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');

@@ -78,6 +78,63 @@ export class ChatService {
     }
   }
 
+  // Get recent conversations with message history - this is the correct method for persistent conversations
+  static async getRecentConversations(): Promise<Conversation[]> {
+    try {
+      console.log('🔄 Fetching recent conversations from:', `${API_BASE_URL}/direct-messages/recent`);
+      console.log('📡 Using headers:', getAuthHeaders());
+      
+      const response = await axios.get(`${API_BASE_URL}/direct-messages/recent`, {
+        headers: getAuthHeaders()
+      });
+      
+      console.log('✅ Recent conversations response:', response.data);
+      
+      // The response should be an array of conversation objects based on your API screenshot
+      if (Array.isArray(response.data)) {
+        return response.data.map((conv: any) => ({
+          id: conv.userId || conv.id,
+          participantIds: conv.receiverId ? [conv.senderId, conv.receiverId] : [conv.userId],
+          participants: [
+            {
+              id: conv.receiverId || conv.userId,
+              name: conv.receiverName || conv.name || 'Unknown User',
+              email: conv.email || '',
+              handle: conv.handle || null,
+              role: 'client' as const, // Default role - you might want to get this from the API response
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            } as User
+          ],
+          lastMessage: conv.lastMessage ? {
+            id: conv.lastMessage.id,
+            conversationId: conv.userId,
+            senderId: conv.lastMessage.senderId,
+            receiverId: conv.lastMessage.receiverId,
+            content: conv.lastMessage.content,
+            messageType: conv.lastMessage.messageType || 'TEXT',
+            createdAt: conv.lastMessage.createdAt,
+            updatedAt: conv.lastMessage.updatedAt || conv.lastMessage.createdAt,
+            isRead: conv.lastMessage.readAt !== null
+          } : undefined,
+          unreadCount: conv.unreadCount || 0,
+          createdAt: conv.lastMessage?.createdAt || new Date().toISOString(),
+          updatedAt: conv.lastMessage?.createdAt || new Date().toISOString()
+        } as Conversation));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('❌ Error fetching recent conversations:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
+    }
+  }
+
   // Get messages for a specific conversation with another user
   static async getMessages(otherUserId: number, page: number = 0, size: number = 50): Promise<PaginatedResponse<Message>> {
     try {

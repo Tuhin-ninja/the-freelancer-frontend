@@ -40,8 +40,10 @@ const ChatPage = () => {
     try {
       setLoading(true);
       console.log('🔄 Loading conversations from server...');
-      const data = await ChatService.getConversations();
-      console.log('📱 Loaded conversations:', data);
+      
+      // Use the recent messages API to get conversations with actual message history
+      const data = await ChatService.getRecentConversations();
+      console.log('📱 Loaded recent conversations:', data);
       setConversations(data);
     } catch (error) {
       console.error('Failed to load conversations:', error);
