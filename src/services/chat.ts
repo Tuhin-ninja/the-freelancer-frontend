@@ -90,6 +90,11 @@ export class ChatService {
       
       console.log('✅ Recent conversations response:', response.data);
       
+      // Debug: Log the first conversation to see what data we're receiving
+      if (response.data.length > 0) {
+        console.log('🔍 First conversation data:', response.data[0]);
+      }
+      
       // The response should be an array of conversation objects based on your API screenshot
       if (Array.isArray(response.data)) {
         return response.data.map((conv: any) => ({
@@ -101,7 +106,7 @@ export class ChatService {
               name: conv.receiverName || conv.name || 'Unknown User',
               email: conv.email || '',
               handle: conv.handle || null,
-              role: 'client' as const, // Default role - you might want to get this from the API response
+              role: conv.receiverRole || conv.role || 'freelancer' as const, // Use actual role from API
               isActive: true,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()

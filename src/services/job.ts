@@ -1,5 +1,111 @@
 import api from '@/lib/api';
 import { Job, Proposal, PaginatedResponse } from '@/types/api';
+import axios from 'axios';
+
+// Job Proposal Service API instance
+const jobProposalAPI = axios.create({
+  baseURL: 'http://localhost:8080',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000, // 10 second timeout
+});
+
+// Request interceptor for job proposal service
+// jobProposalAPI.interceptors.request.use(
+//   (config) => {
+//     if (typeof window !== 'undefined') {
+//       const token = localStorage.getItem('c-access-token');
+//       const userString = localStorage.getItem('user');
+      
+//       console.log('Request interceptor - Token:', token ? 'Present' : 'Missing');
+//       console.log('Request interceptor - User data:', userString ? 'Present' : 'Missing');
+      
+//       if (token) {
+//         config.headers.Authorization = token;
+//       }
+      
+//       // Add user headers required by job-proposal-service
+//       if (userString) {
+//         try {
+//           const user = JSON.parse(userString);
+//           config.headers['X-User-Id'] = user.id?.toString() || '';
+//           config.headers['X-User-Email'] = user.email || '';
+//           config.headers['X-User-Role'] = user.role?.toUpperCase() || '';
+//           console.log('Request headers set:', {
+//             'X-User-Id': config.headers['X-User-Id'],
+//             'X-User-Email': config.headers['X-User-Email'],
+//             'X-User-Role': config.headers['X-User-Role']
+//           });
+//         } catch (error) {
+//           console.error('Error parsing user data from localStorage:', error);
+//         }
+//       }
+      
+//       console.log('Final request config:', {
+//         url: config.url,
+//         headers: config.headers,
+//         params: config.params
+//       });
+//     }
+//     return config;
+//   },
+//   (error) => {
+//     return Promise.reject(error);
+//   }
+// );
+
+// // Response interceptor to log errors
+// jobProposalAPI.interceptors.response.use(
+//   (response) => {
+//     console.log('API Response:', response.status, response.config.url);
+//     return response;
+//   },
+//   (error) => {
+//     console.error('API Error:', error.response?.status, error.response?.data, error.config?.url);
+//     return Promise.reject(error);
+//   }
+// );
+
+jobProposalAPI.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken');
+      console.log(token);
+      // const userString = localStorage.getItem('user');
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      // if (userString) {
+      //   try {
+      //     const user = JSON.parse(userString);
+      //     config.headers['X-User-Id'] = user.id?.toString() || '';
+      //     config.headers['X-User-Email'] = user.email || '';
+      //     config.headers['X-User-Role'] = user.role?.toUpperCase() || '';
+      //   } catch (error) {
+      //     console.error('Invalid user data in localStorage');
+      //   }
+      // }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response Interceptor
+jobProposalAPI.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error.response) {
+      console.error('Network/Server Error - Check API URL or CORS');
+    } else {
+      console.error(`API Error: ${error.response.status}`, error.response.data);
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const jobAPI = {
   // Get all jobs with pagination and filters
@@ -10,26 +116,39 @@ export const jobAPI = {
     stack?: string[];
     budget?: string;
   }): Promise<PaginatedResponse<Job>> => {
-    const response = await api.get('/api/jobs', { params });
+    const response = await jobProposalAPI.get('/api/jobs/search/with-client-info', { params });
     return response.data;
   },
 
   // Get job by ID
   getJobById: async (jobId: number): Promise<Job> => {
-    const response = await api.get(`/api/jobs/${jobId}`);
+    const response = await jobProposalAPI.get(`/api/jobs/${jobId}`);
     return response.data;
   },
 
-  // Get jobs by client ID
+  // Get jobs by client ID (authenticated user's jobs)
   getJobsByClientId: async (clientId: number): Promise<Job[]> => {
-    const response = await api.get(`/api/jobs/client/${clientId}`);
+    const response = await jobProposalAPI.get(`/api/jobs/user/${clientId}`);
     return response.data;
   },
   
   // Get jobs posted by the current logged-in user
   getMyJobs: async (): Promise<Job[]> => {
-    const response = await api.get('/api/jobs/my-jobs');
-    return response.data;
+    try {
+      // Accept status as parameter and use correct access token header
+      const status = 'DRAFT';
+      console.log('Making request to /api/jobs/my-jobs with status:', status);
+      // console.log('Auth token:', localStorage.getItem('c-access-token') ? 'Present' : 'Missing');
+      
+      const response = await jobProposalAPI.get(`/api/jobs/my-jobs?status=${status}`);
+      console.log('Response received:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error in getMyJobs:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      throw error;
+    }
   },
 
   // Search jobs
@@ -39,36 +158,36 @@ export const jobAPI = {
     budgetMin?: number;
     budgetMax?: number;
   }): Promise<Job[]> => {
-    const response = await api.get('/api/jobs/search', { params });
+    const response = await jobProposalAPI.get('/api/jobs/search', { params });
     return response.data;
   },
 
-  // Create new job
+  // Create new job - Updated for job-proposal-service
   createJob: async (jobData: {
-    title: string;
+    projectName: string;
     description: string;
-    stack?: string[];
+    category?: string;
+    skills?: string[];
+    isUrgent?: boolean;
     budgetType: 'FIXED' | 'HOURLY';
     minBudgetCents?: number;
     maxBudgetCents?: number;
-    currency: string;
     ndaRequired?: boolean;
     ipAssignment?: boolean;
-    repoLink?: string;
   }): Promise<Job> => {
-    const response = await api.post('/api/jobs', jobData);
+    const response = await jobProposalAPI.post('/api/jobs', jobData);
     return response.data;
   },
 
   // Update job
   updateJob: async (jobId: number, jobData: Partial<Job>): Promise<Job> => {
-    const response = await api.put(`/api/jobs/${jobId}`, jobData);
+    const response = await jobProposalAPI.put(`/api/jobs/my-jobs/${jobId}`, jobData);
     return response.data;
   },
 
   // Delete job
   deleteJob: async (jobId: number): Promise<void> => {
-    await api.delete(`/api/jobs/${jobId}`);
+    await jobProposalAPI.delete(`/api/jobs/my-jobs/${jobId}`);
   },
 };
 

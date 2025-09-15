@@ -56,6 +56,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     if (!currentUser) return null;
     
     // For chat-based conversations, participants[0] is the other user
+    console.log(conversation);
     if (conversation.participants && conversation.participants.length > 0) {
       const otherUser = conversation.participants.find(p => p.id !== currentUser.id);
       if (otherUser) return otherUser;
@@ -146,11 +147,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   </p>
 
                   {/* Unread badge */}
-                  {hasUnread && (
+                  {/* {hasUnread && (
                     <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
                       {conversation.unreadCount}
                     </span>
-                  )}
+                  )} */}
                 </div>
 
                 {/* User role badge */}

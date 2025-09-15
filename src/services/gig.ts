@@ -9,13 +9,13 @@ export const gigAPI = {
     category?: string;
     tags?: string[];
   }): Promise<PaginatedResponse<Gig>> => {
-    const response = await api.get('/api/gigs', { params });
+    const response = await api.get('/api/gigs/search/with-freelancer', { params });
     return response.data;
   },
 
   // Get gig by ID
   getGigById: async (gigId: number): Promise<Gig> => {
-    const response = await api.get(`/api/gigs/${gigId}`);
+    const response = await api.get(`/api/gigs/with-freelancer/${gigId}`);
     return response.data;
   },
 

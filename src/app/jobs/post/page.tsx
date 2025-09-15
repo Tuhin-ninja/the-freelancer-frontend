@@ -7,28 +7,39 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import jobService from '@/services/job';
-import { CheckCircle, AlertCircle, ChevronRight, DollarSign, Clock } from 'lucide-react';
+import { CheckCircle, AlertCircle, ChevronRight, DollarSign, Clock, Calendar, Paperclip, Eye, Plus, X, PlayCircle, PauseCircle, StopCircle, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function PostJobPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [authChecked, setAuthChecked] = useState(false);
   const [formData, setFormData] = useState({
-    title: '',
+    projectName: '',
     description: '',
-    stack: [] as string[],
+    category: '',
+    skills: [] as string[],
+    isUrgent: false,
     budgetType: 'FIXED' as ('FIXED' | 'HOURLY'),
     minBudgetCents: 0,
     maxBudgetCents: 0,
-    currency: 'USD',
     ndaRequired: false,
-    ipAssignment: false,
-    repoLink: '',
+    ipAssignment: true,
+    deadline: '',
+    expectedDuration: '',
+    status: 'OPEN' as ('OPEN' | 'DRAFT'),
   });
   const [currentSkill, setCurrentSkill] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Suggested skills based on common categories
+  const suggestedSkills = [
+    'Full Stack Development', 'Mobile App Development', 'User Experience Research',
+    'User Interface / IA', 'Website Development'
+  ];
 
   // Initialize auth state from localStorage if Redux state is empty
   useEffect(() => {
@@ -36,27 +47,31 @@ export default function PostJobPage() {
     if (isAuthenticated && user) {
       setAuthChecked(true);
       console.log("Auth already loaded in Redux:", { name: user.name, role: user.role });
-      
-      // Check if user is a client
-      if (user.role !== 'client') {
-        console.log("Redirecting: User is not a client");
-        router.push('/jobs');
+
+      // Check if user is a client (case insensitive)
+      const userRole = user.role?.toLowerCase();
+      if (userRole !== 'client') {
+        console.log("Redirecting: User is not a client, role is:", user.role);
+        // Commenting out redirect to allow testing - uncomment if needed
+        // router.push('/jobs');
       }
     } else {
       // Try to load from localStorage if needed
       const userString = localStorage.getItem('user');
       const accessToken = localStorage.getItem('accessToken');
-      
+
       if (userString && accessToken) {
         try {
           const localUser = JSON.parse(userString);
           console.log("Loaded user from localStorage:", localUser);
-          
-          if (localUser.role !== 'client') {
-            console.log("Redirecting: User from localStorage is not a client");
-            router.push('/jobs');
+
+          const userRole = localUser.role?.toLowerCase();
+          if (userRole !== 'client') {
+            console.log("Redirecting: User from localStorage is not a client, role is:", localUser.role);
+            // Commenting out redirect to allow testing - uncomment if needed
+            // router.push('/jobs');
           }
-          
+
           setAuthChecked(true);
         } catch (e) {
           console.error("Error parsing user from localStorage:", e);
@@ -94,24 +109,63 @@ export default function PostJobPage() {
   };
 
   const handleAddSkill = () => {
-    if (currentSkill.trim() && !formData.stack.includes(currentSkill.trim())) {
+    if (currentSkill.trim() && !formData.skills.includes(currentSkill.trim()) && formData.skills.length < 10) {
       setFormData((prev) => ({
         ...prev,
-        stack: [...prev.stack, currentSkill.trim()],
+        skills: [...prev.skills, currentSkill.trim()],
       }));
       setCurrentSkill('');
+    }
+  };
+
+  const handleAddSkillFromSuggestion = (skill: string) => {
+    if (!formData.skills.includes(skill) && formData.skills.length < 10) {
+      setFormData((prev) => ({
+        ...prev,
+        skills: [...prev.skills, skill],
+      }));
     }
   };
 
   const handleRemoveSkill = (skill: string) => {
     setFormData((prev) => ({
       ...prev,
-      stack: prev.stack.filter((s) => s !== skill),
+      skills: prev.skills.filter((s: string) => s !== skill),
     }));
+  };
+
+  const validateForm = () => {
+    if (!formData.projectName.trim()) {
+      setError('Project name is required');
+      return false;
+    }
+    if (formData.projectName.length < 5) {
+      setError('Project name must be at least 5 characters long');
+      return false;
+    }
+    if (!formData.description.trim()) {
+      setError('Job description is required');
+      return false;
+    }
+    if (formData.minBudgetCents <= 0 || formData.maxBudgetCents <= 0) {
+      setError('Budget amounts must be greater than 0');
+      return false;
+    }
+    if (formData.minBudgetCents >= formData.maxBudgetCents) {
+      setError('Maximum budget must be greater than minimum budget');
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -128,11 +182,11 @@ export default function PostJobPage() {
 
       await jobService.jobAPI.createJob(jobData);
       setSuccess(true);
-      
-      // Redirect after success
+
+      // Redirect to dashboard after success (like gig creation)
       setTimeout(() => {
-        router.push('/jobs');
-      }, 2000);
+        router.push('/dashboard');
+      }, 1500);
     } catch (err: any) {
       console.error('Error posting job:', err);
       setError(err.response?.data?.message || 'Failed to post job. Please try again.');
@@ -153,10 +207,10 @@ export default function PostJobPage() {
   // Check if user is not authenticated from Redux or localStorage
   const userString = localStorage.getItem('user');
   const isLocalStorageAuthenticated = !!userString && !!localStorage.getItem('accessToken');
-  
+
   if (!isAuthenticated && !isLocalStorageAuthenticated) {
     console.log("Not authenticated in Redux or localStorage");
-    
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
@@ -166,7 +220,7 @@ export default function PostJobPage() {
             You need to be logged in as a client to post a job.
           </p>
           <div className="flex justify-center">
-            <Button 
+            <Button
               onClick={() => router.push('/auth/login')}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
@@ -179,7 +233,7 @@ export default function PostJobPage() {
   }
 
   // Only clients can post jobs
-  if (user && user.role !== 'client') {
+  if (user && user.role !== 'CLIENT') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
@@ -189,7 +243,7 @@ export default function PostJobPage() {
             Only clients can post jobs. Your account type is {user.role}.
           </p>
           <div className="flex justify-center">
-            <Button 
+            <Button
               onClick={() => router.push('/jobs')}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
@@ -203,96 +257,329 @@ export default function PostJobPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-center mb-4">Job Posted Successfully!</h1>
-          <p className="text-gray-600 text-center mb-6">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-green-100">
+        <motion.div
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-2xl p-10 max-w-md w-full mx-4"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="text-2xl font-bold text-center mb-4"
+          >
+            🚀 Job Posted Successfully!
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="text-gray-600 text-center mb-6"
+          >
             Your job has been posted and is now visible to freelancers.
-          </p>
-          <div className="flex justify-center">
-            <Button 
-              onClick={() => router.push('/jobs')}
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="flex justify-center"
+          >
+            <Button
+              onClick={() => router.push('/dashboard')}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              View All Jobs
+              Go to Dashboard
             </Button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Post a New Job</h1>
-          <p className="text-gray-600 mt-2">
-            Find the perfect freelancer for your project by creating a detailed job post.
-          </p>
+  // Preview Modal Component
+  const PreviewModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto"
+      >
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-900">Job Preview</h2>
+          <Button
+            type="button"
+            onClick={() => setShowPreview(false)}
+            variant="outline"
+            size="sm"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
-        {error && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-              <p className="text-red-700">{error}</p>
+        <div className="p-6 space-y-6">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">{formData.projectName || 'Project Name'}</h3>
+            {formData.isUrgent && (
+              <div className="inline-block bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium mt-2">
+                🚀 URGENT
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-2">Description</h4>
+            <p className="text-gray-600 whitespace-pre-wrap">{formData.description || 'No description provided'}</p>
+          </div>
+
+          {formData.skills.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Required Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {formData.skills.map((skill: string) => (
+                  <span key={skill} className="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Budget</h4>
+              <p className="text-gray-600">
+                ${formData.minBudgetCents} - ${formData.maxBudgetCents} ({formData.budgetType})
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-2">Category</h4>
+              <p className="text-gray-600">{formData.category || 'Not specified'}</p>
             </div>
           </div>
-        )}
 
-        <div className="bg-white shadow-md rounded-lg overflow-hidden mb-6">
-          <div className="p-6">
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-6">
+          {/* Job Status */}
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-2">Job Status</h4>
+            <div className="flex items-center space-x-2">
+              {(() => {
+                const statusConfig = {
+                  'OPEN': { label: 'Open', icon: PlayCircle, color: 'text-green-600 bg-green-100' },
+                  'DRAFT': { label: 'Draft', icon: PauseCircle, color: 'text-yellow-600 bg-yellow-100' },
+                }[formData.status] || { label: 'Open', icon: PlayCircle, color: 'text-green-600 bg-green-100' };
+                
+                const IconComponent = statusConfig.icon;
+                return (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusConfig.color}`}>
+                    <IconComponent className="w-4 h-4 mr-1" />
+                    {statusConfig.label}
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
+
+          {(formData.deadline || formData.expectedDuration) && (
+            <div className="grid grid-cols-2 gap-4">
+              {formData.deadline && (
                 <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                    Job Title*
-                  </label>
-                  <Input
-                    id="title"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Full-Stack Developer for E-commerce Website"
-                    required
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Keep it clear and specific to attract the right freelancers.
-                  </p>
+                  <h4 className="font-semibold text-gray-800 mb-2">Deadline</h4>
+                  <p className="text-gray-600">{new Date(formData.deadline).toLocaleDateString()}</p>
                 </div>
-
+              )}
+              {formData.expectedDuration && (
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                    Job Description*
-                  </label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    placeholder="Describe your project, requirements, deliverables, and any other relevant details..."
-                    required
-                    className="w-full min-h-[200px]"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Be detailed about project scope, timeline, and specific requirements.
-                  </p>
+                  <h4 className="font-semibold text-gray-800 mb-2">Expected Duration</h4>
+                  <p className="text-gray-600">{formData.expectedDuration}</p>
                 </div>
+              )}
+            </div>
+          )}
+        </div>
 
-                <div>
-                  <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
-                    Required Skills
-                  </label>
-                  <div className="flex gap-2 mb-2">
+        <div className="p-6 border-t border-gray-200 flex justify-end space-x-2">
+          <Button type="button" onClick={() => setShowPreview(false)} variant="outline">
+            Edit More
+          </Button>
+          <Button type="button" onClick={() => { setShowPreview(false); document.getElementById('jobForm')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); }} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Post Job
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+
+  return (
+    <>
+      {showPreview && <PreviewModal />}
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-green-100 px-4 py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-2xl p-10 w-full max-w-4xl"
+        >
+          <div className="text-center mb-10">
+            <h2 className="text-5xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 bg-clip-text text-transparent mb-3 drop-shadow-sm tracking-tight">
+              Post a New Job
+            </h2>
+            <p className="text-gray-600 text-base max-w-md mx-auto leading-relaxed">
+              Find the perfect freelancer for your project by creating a detailed job post.
+            </p>
+          </div>
+
+
+          {error && (
+            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                <p className="text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="projectName" className="block text-sm font-medium text-gray-700 mb-2">
+                Project Name*
+              </label>
+              <Input
+                id="projectName"
+                name="projectName"
+                value={formData.projectName}
+                onChange={handleInputChange}
+                placeholder="e.g., Full-Stack E-commerce Website Development"
+                required
+                className="w-full rounded-xl border border-transparent bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-indigo-200 hover:from-indigo-100 hover:via-purple-100 hover:to-pink-100 transition-all duration-300 ease-in-out p-3"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Keep it clear and specific to attract the right freelancers.
+              </p>
+            </div>
+
+            {/* Job Status Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Job Status*
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 justify-between">
+                {[
+                  { value: 'OPEN', label: 'Open', icon: PlayCircle, color: 'from-green-500 to-emerald-500', bgColor: 'from-green-50 to-emerald-50' },
+                  { value: 'DRAFT', label: 'Draft', icon: PauseCircle, color: 'from-yellow-400 to-yellow-500', bgColor: 'from-yellow-50 to-yellow-100' },
+                ].map((status) => {
+                  const IconComponent = status.icon;
+                  const isSelected = formData.status === status.value;
+                  
+                  return (
+                    <motion.button
+                      key={status.value}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, status: status.value as any }))}
+                      className={`
+                        relative p-4 rounded-2xl border-2 transition-all duration-300 group
+                        ${isSelected 
+                          ? `border-transparent bg-gradient-to-r ${status.color} text-white shadow-xl transform scale-105`
+                          : `border-gray-200 bg-gradient-to-r ${status.bgColor} text-gray-700 hover:border-gray-300 hover:shadow-lg`
+                        }
+                      `}
+                      whileHover={{ scale: isSelected ? 1.05 : 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className="flex flex-col items-center space-y-2">
+                        <IconComponent 
+                          className={`h-6 w-6 transition-all duration-300 ${
+                            isSelected ? 'text-white' : 'text-gray-600 group-hover:text-gray-800'
+                          }`} 
+                        />
+                        <span className={`text-sm font-medium text-center ${
+                          isSelected ? 'text-white' : 'text-gray-700 group-hover:text-gray-900'
+                        }`}>
+                          {status.label}
+                        </span>
+                      </div>
+                      
+                      {/* Selected indicator */}
+                      {isSelected && (
+                        <motion.div
+                          initial={{ scale: 0, rotate: 180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          className="absolute top-2 right-2 w-6 h-6 bg-white/20 rounded-full flex items-center justify-center"
+                        >
+                          <CheckCircle className="h-4 w-4 text-white" />
+                        </motion.div>
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Choose the current status of your job posting.
+              </p>
+            </div>
+
+
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                Job Description*
+              </label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Describe your project, requirements, deliverables, and any other relevant details..."
+                required
+                className="w-full min-h-[200px] rounded-xl border border-transparent bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-purple-200 hover:from-purple-100 hover:via-pink-100 hover:to-red-100 transition-all duration-300 ease-in-out p-3"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Be detailed about project scope, timeline, and specific requirements.
+              </p>
+            </div>
+
+
+            <div>
+              <label htmlFor="skills" className="block text-2xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 bg-clip-text text-transparent mb-3">
+                What skills are required?
+              </label>
+              <p className="text-gray-600 text-base mb-5">
+                We’ve detected the following skills to suit your project. Modify or add up to 10 skills to best match your needs.
+              </p>
+
+              {/* Skills Selection Area */}
+              <div className="border border-gray-100 rounded-2xl bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 p-6 shadow-sm space-y-4 transition-all duration-300">
+                {/* Selected Skills Row */}
+                <div className="flex flex-wrap gap-3">
+                  {formData.skills.map((skill: string) => (
+                    <span
+                      key={skill}
+                      className="bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-full flex items-center text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                    >
+                      {skill}
+                      <button
+                        type="button"
+                        className="ml-2 text-gray-400 hover:text-red-500 transition-colors"
+                        onClick={() => handleRemoveSkill(skill)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+
+                  {/* Add Custom Skill Input */}
+                  {formData.skills.length < 10 && (
                     <Input
-                      id="skills"
                       value={currentSkill}
                       onChange={(e) => setCurrentSkill(e.target.value)}
-                      placeholder="e.g., React, Node.js, etc."
-                      className="flex-1"
+                      placeholder="Add a skill..."
+                      className="flex-1 min-w-[200px] max-w-[300px] bg-white text-gray-900 border border-gray-200 rounded-xl shadow-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-200 placeholder-gray-400 transition-all duration-300 ease-in-out"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -300,201 +587,177 @@ export default function PostJobPage() {
                         }
                       }}
                     />
-                    <Button type="button" onClick={handleAddSkill}>
-                      Add
-                    </Button>
-                  </div>
-                  
-                  {formData.stack.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.stack.map((skill) => (
-                        <span 
-                          key={skill}
-                          className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center"
-                        >
-                          {skill}
-                          <button
-                            type="button"
-                            className="ml-1 text-blue-800 hover:text-blue-900"
-                            onClick={() => handleRemoveSkill(skill)}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="budgetType" className="block text-sm font-medium text-gray-700 mb-1">
-                      Budget Type*
-                    </label>
-                    <select
-                      id="budgetType"
-                      name="budgetType"
-                      value={formData.budgetType}
-                      onChange={handleSelectChange}
-                      className="w-full rounded-md border border-gray-300 py-2 px-3"
-                      required
-                    >
-                      <option value="FIXED">Fixed Price</option>
-                      <option value="HOURLY">Hourly Rate</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-                      Currency*
-                    </label>
-                    <select
-                      id="currency"
-                      name="currency"
-                      value={formData.currency}
-                      onChange={handleSelectChange}
-                      className="w-full rounded-md border border-gray-300 py-2 px-3"
-                      required
-                    >
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="minBudgetCents" className="block text-sm font-medium text-gray-700 mb-1">
-                      Minimum Budget*
-                    </label>
-                    <div className="flex items-center">
-                      <span className="text-gray-500 mr-2">
-                        <DollarSign className="h-5 w-5" />
-                      </span>
-                      <Input
-                        id="minBudgetCents"
-                        name="minBudgetCents"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.minBudgetCents}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        required
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="maxBudgetCents" className="block text-sm font-medium text-gray-700 mb-1">
-                      Maximum Budget*
-                    </label>
-                    <div className="flex items-center">
-                      <span className="text-gray-500 mr-2">
-                        <DollarSign className="h-5 w-5" />
-                      </span>
-                      <Input
-                        id="maxBudgetCents"
-                        name="maxBudgetCents"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.maxBudgetCents}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        required
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-200 pt-4">
-                  <div className="space-y-4">
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="ndaRequired"
-                          name="ndaRequired"
-                          type="checkbox"
-                          checked={formData.ndaRequired}
-                          onChange={handleCheckboxChange}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="ndaRequired" className="font-medium text-gray-700">
-                          NDA Required
-                        </label>
-                        <p className="text-gray-500">
-                          The freelancer will be required to sign a Non-Disclosure Agreement.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="ipAssignment"
-                          name="ipAssignment"
-                          type="checkbox"
-                          checked={formData.ipAssignment}
-                          onChange={handleCheckboxChange}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="ipAssignment" className="font-medium text-gray-700">
-                          IP Assignment
-                        </label>
-                        <p className="text-gray-500">
-                          The freelancer must transfer intellectual property rights for the work.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="repoLink" className="block text-sm font-medium text-gray-700 mb-1">
-                    Repository Link (Optional)
-                  </label>
-                  <Input
-                    id="repoLink"
-                    name="repoLink"
-                    value={formData.repoLink}
-                    onChange={handleInputChange}
-                    placeholder="e.g., https://github.com/username/repo"
-                    className="w-full"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Link to a GitHub/GitLab repository if applicable.
-                  </p>
-                </div>
-
-                <div className="flex justify-end pt-4">
-                  <Button
-                    type="button"
-                    onClick={() => router.back()}
-                    variant="outline"
-                    className="mr-2"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {loading ? 'Posting...' : 'Post Job'}
-                    {!loading && <ChevronRight className="ml-2 h-4 w-4" />}
-                  </Button>
-                </div>
+                {/* Skills Counter */}
+                <p className="text-sm text-gray-600">
+                  {formData.skills.length}/10 skills selected
+                </p>
               </div>
-            </form>
-          </div>
-        </div>
+
+              {/* Suggested Skills */}
+              <div className="mt-5">
+                <p className="text-base text-gray-700 mb-2">
+                  <strong className="font-semibold text-gray-800">Suggested skills:</strong>{' '}
+                  <span className="space-x-2">
+                    {suggestedSkills
+                      .filter(skill => !formData.skills.includes(skill))
+                      .map((skill, index) => (
+                        <button
+                          key={skill}
+                          type="button"
+                          onClick={() => handleAddSkillFromSuggestion(skill)}
+                          className="inline-block bg-gradient-to-r from-pink-500 to-red-500 text-white px-3 py-1 rounded-full text-xs font-medium hover:from-pink-600 hover:to-red-600 transition-all duration-200 disabled:opacity-40"
+                          disabled={formData.skills.length >= 10}
+                        >
+                          {skill}
+                        </button>
+                      ))}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleSelectChange}
+                  className="w-full rounded-xl border border-transparent bg-gradient-to-r from-purple-100 via-pink-100 to-red-100 py-2 px-3 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-purple-200 hover:from-purple-200 hover:via-pink-200 hover:to-red-200 transition-all duration-300 ease-in-out"
+                >
+                  <option value="">Select a category</option>
+                  <option value="Web Development">Web Development</option>
+                  <option value="Mobile Development">Mobile Development</option>
+                  <option value="AI & Machine Learning">AI & Machine Learning</option>
+                  <option value="Graphic Design">Graphic Design</option>
+                  <option value="Digital Marketing">Digital Marketing</option>
+                  <option value="Writing & Translation">Writing & Translation</option>
+                  <option value="Video & Animation">Video & Animation</option>
+                  <option value="Music & Audio">Music & Audio</option>
+                  <option value="Data Science">Data Science</option>
+                  <option value="Business">Business</option>
+                  <option value="Photography">Photography</option>
+                </select>
+              </div>
+
+
+              <div>
+                <label htmlFor="budgetType" className="block text-sm font-medium text-gray-700 mb-2">
+                  Budget Type*
+                </label>
+                <select
+                  id="budgetType"
+                  name="budgetType"
+                  value={formData.budgetType}
+                  onChange={handleSelectChange}
+                  required
+                  className="w-full rounded-xl border border-transparent bg-gradient-to-r from-green-100 via-blue-100 to-purple-100 py-2 px-3 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-green-200 hover:from-green-200 hover:via-blue-200 hover:to-purple-200 transition-all duration-300 ease-in-out"
+                >
+                  <option value="FIXED">Fixed Price</option>
+                  <option value="HOURLY">Hourly Rate</option>
+                </select>
+              </div>
+
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-base font-semibold text-gray-800 mb-1">
+                  Minimum Budget ($)
+                </label>
+                <Input
+                  id="minBudgetCents"
+                  name="minBudgetCents"
+                  type="number"
+                  value={formData.minBudgetCents}
+                  onChange={handleInputChange}
+                  placeholder="e.g., 500"
+                  required
+                  className="w-full rounded-xl border border-transparent bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-green-200 hover:from-green-100 hover:via-blue-100 hover:to-purple-100 transition-all duration-300 ease-in-out p-3"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-base font-semibold text-gray-800 mb-1">
+                  Maximum Budget ($)
+                </label>
+                <Input
+                  id="maxBudgetCents"
+                  name="maxBudgetCents"
+                  type="number"
+                  value={formData.maxBudgetCents}
+                  onChange={handleInputChange}
+                  placeholder="e.g., 1500"
+                  required
+                  className="w-full rounded-xl border border-transparent bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-green-200 hover:from-green-100 hover:via-blue-100 hover:to-purple-100 transition-all duration-300 ease-in-out p-3"
+                />
+              </div>
+            </div>
+
+
+            <div className="space-y-4 pt-4">
+              <div className="flex items-center justify-between bg-white border border-gray-200 p-3 rounded-lg">
+                <div>
+                  <label htmlFor="isUrgent" className="font-medium text-gray-700">
+                    Urgent Job
+                  </label>
+                  <p className="text-xs text-gray-500">Mark this job as urgent to get faster responses.</p>
+                </div>
+                <label htmlFor="isUrgent" className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="isUrgent" name="isUrgent" checked={formData.isUrgent} onChange={handleCheckboxChange} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between bg-white border border-gray-200 p-3 rounded-lg">
+                <div>
+                  <label htmlFor="ndaRequired" className="font-medium text-gray-700">
+                    NDA Required
+                  </label>
+                  <p className="text-xs text-gray-500">Require freelancers to sign a Non-Disclosure Agreement.</p>
+                </div>
+                <label htmlFor="ndaRequired" className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="ndaRequired" name="ndaRequired" checked={formData.ndaRequired} onChange={handleCheckboxChange} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between bg-white border border-gray-200 p-3 rounded-lg">
+                <div>
+                  <label htmlFor="ipAssignment" className="font-medium text-gray-700">
+                    IP Assignment
+                  </label>
+                  <p className="text-xs text-gray-500">Assign intellectual property rights to you upon completion.</p>
+                </div>
+                <label htmlFor="ipAssignment" className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="ipAssignment" name="ipAssignment" checked={formData.ipAssignment} onChange={handleCheckboxChange} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-6 text-center">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full max-w-xs mx-auto bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white font-semibold py-2 px-4 rounded-2xl shadow-lg hover:from-purple-600 hover:via-pink-600 hover:to-red-600 transition-all duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Posting...' : 'Post Job'}
+              </Button>
+            </div>
+
+          </form>
+        </motion.div>
       </div>
-    </div>
+    </>
   );
 }
+
+

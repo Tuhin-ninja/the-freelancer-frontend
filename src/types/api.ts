@@ -64,7 +64,7 @@ export interface Gig {
   delivery_time: number;
   deliveryDays?: number;
   freelancer_id: number;
-  freelancer?: {
+  freelancerInfo?: {
     id: number;
     name: string;
     profilePictureUrl?: string;
@@ -91,24 +91,33 @@ export interface GigPackage {
 
 export interface Job {
   id: number;
-  title: string;
+  clientId: number;
+  projectName: string;
   description: string;
-  budget: number;
+  category?: string;
+  skills?: string[];
+  isUrgent?: boolean;
+  budgetType: 'FIXED' | 'HOURLY';
+  minBudgetCents?: number;
+  maxBudgetCents?: number;
+  ndaRequired?: boolean;
+  ipAssignment?: boolean;
+  status: 'DRAFT' | 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
+  editedAt?: string;
+  // Legacy fields for backward compatibility
+  title?: string;
+  budget?: number;
   budget_min?: number;
   budget_max?: number;
-  skills?: string[];
   deadline?: Date | string;
-  status: string;
-  clientId: number;
   client?: {
     id: number;
     name: string;
     email?: string;
   };
-  proposalCount?: number;
-  createdAt: Date;
   created_at?: Date;
-  updatedAt: Date;
 }
 
 export interface Proposal {
