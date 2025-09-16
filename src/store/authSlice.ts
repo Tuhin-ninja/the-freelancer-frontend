@@ -35,6 +35,9 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.isLoading = false;
     },
+    updateUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+    },
     logout: (state) => {
       state.user = null;
       state.accessToken = null;
@@ -42,18 +45,9 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.isLoading = false;
     },
-    updateUser: (state, action: PayloadAction<User>) => {
-      state.user = action.payload;
-    },
-    setTokens: (state, action: PayloadAction<{
-      accessToken: string;
-      refreshToken: string;
-    }>) => {
-      state.accessToken = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
-    },
   },
 });
 
-export const { setLoading, loginSuccess, logout, updateUser, setTokens } = authSlice.actions;
+export const { setLoading, loginSuccess, logout, updateUser } = authSlice.actions;
+
 export default authSlice.reducer;

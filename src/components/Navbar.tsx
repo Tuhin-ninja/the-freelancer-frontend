@@ -109,19 +109,25 @@ const Navbar = () => {
                         />
                         <span className="font-semibold text-blue-700">{user?.name}</span>
                         <span className="text-xs text-gray-500 mb-2">{user?.email}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full mb-2"
-                          onClick={() => router.push('/dashboard')}
+                        <Link href="/dashboard" className="w-full">
+                          <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                            <Briefcase className="mr-2 h-4 w-4" />
+                            Dashboard
+                          </button>
+                        </Link>
+                        <Link href="/profile" className="w-full">
+                          <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                            <User className="mr-2 h-4 w-4" />
+                            Profile
+                          </button>
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                         >
-                          <Briefcase className="h-4 w-4 mr-2 text-blue-500" />
-                          <span className="transition-colors duration-150 group-hover:text-blue-600 group-active:text-blue-700">Dashboard</span>
-                        </Button>
-                        <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleLogout}>
-                          <LogOut className="h-4 w-4 mr-2 text-red-500" />
-                          <span className="transition-colors duration-150 group-hover:text-red-600 group-active:text-red-700">Logout</span>
-                        </Button>
+                          <LogOut className="mr-2 h-4 w-4 text-red-500" />
+                          Logout
+                        </button>
                       </div>
                     </div>
                   )}
