@@ -16,6 +16,7 @@ export const gigAPI = {
   // Get gig by ID
   getGigById: async (gigId: number): Promise<Gig> => {
     const response = await api.get(`/api/gigs/with-freelancer/${gigId}`);
+    console.log("first", response.data);
     return response.data;
   },
 
@@ -40,6 +41,7 @@ export const gigAPI = {
     title: string;
     description: string;
     category?: string;
+    status: "ACTIVE" | "INACTIVE";
     tags?: string[];
   }): Promise<Gig> => {
     const response = await api.post('/api/gigs', gigData);
@@ -73,8 +75,25 @@ export const gigAPI = {
     deliveryDays: number;
     revisions?: number;
   }): Promise<GigPackage> => {
-    const response = await api.post(`/api/gigs/${gigId}/packages`, packageData);
+    const response = await api.post(`/api/gigs/my-gigs/${gigId}/packages`, packageData);
     return response.data;
+  },
+
+  // Delete gig package
+  deleteGigPackage: async (gigId: string, packageId: string) => {
+    const response = await api.delete(`/gigs/my-gigs/${gigId}/packages/${packageId}`);
+    return response.data;
+  },
+
+  // Get gig media
+  getGigMedia: async (gigId: string | number): Promise<{ url: string }[]> => {
+    try {
+      const response = await api.get(`/api/gigs/${gigId}/media`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch media for gig ${gigId}:`, error);
+      return []; // Return empty array on error
+    }
   },
 };
 

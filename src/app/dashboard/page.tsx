@@ -1,10 +1,12 @@
 'use client';
 import React from 'react';
 import { useAppSelector } from '@/hooks/redux';
-import { Briefcase, UserCircle, Plus, FileText, BarChart3, Settings, Star } from 'lucide-react';
+import { Briefcase, UserCircle, Plus, FileText, BarChart3, Settings, Star, Edit3, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 const DashboardPage = () => {
+  const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => ({
     user: state.auth.user,
     isAuthenticated: state.auth.isAuthenticated,
@@ -88,14 +90,14 @@ const DashboardPage = () => {
             Welcome back, {user?.name || 'User'}!
           </motion.h1>
           <p className="text-gray-600 text-lg">
-            {user?.role === 'FREELANCER' ? 'Ready to showcase your skills?' : 'Ready to find the perfect freelancer?'}
+            {user?.role === 'FREELANCER' ? 'Ready to showcase your skills?' : 'Ready to find the perfect FREELANCER?'}
           </p>
         </motion.div>
 
         {/* Role-based Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {user?.role === 'FREELANCER' ? (
-            // Freelancer Actions
+            // FREELANCER Actions
             <>
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
@@ -163,7 +165,7 @@ const DashboardPage = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold mb-2">Post a Job</h3>
-                <p className="text-orange-100">Find the perfect freelancer</p>
+                <p className="text-orange-100">Find the perfect FREELANCER</p>
               </motion.div>
 
               <motion.div
@@ -203,7 +205,7 @@ const DashboardPage = () => {
 
         {/* Content Section */}
         {user?.role === 'FREELANCER' ? (
-          /* Freelancer's Gigs Section */
+          /* FREELANCER's Gigs Section */
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -273,6 +275,29 @@ const DashboardPage = () => {
                       ))}
                     </div>
                   )}
+                  
+                  {/* Action Buttons */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end space-x-3">
+                    <motion.button
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => window.open(`/gigs/${gig.id}`, '_blank')}
+                      className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span>View</span>
+                    </motion.button>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => router.push(`/dashboard/gigs/edit/${gig.id}`)}
+                      className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      <span>Edit</span>
+                    </motion.button>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -462,7 +487,7 @@ const DashboardPage = () => {
                     className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg font-semibold text-center hover:shadow-lg transition-all duration-300"
                   >
                     <UserCircle className="h-5 w-5 mx-auto mb-2" />
-                    Browse Freelancers
+                    Browse FREELANCERs
                   </motion.button>
                 </div>
               </div>

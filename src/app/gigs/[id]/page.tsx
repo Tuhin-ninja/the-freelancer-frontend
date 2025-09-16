@@ -21,12 +21,28 @@ import {
   Award,
   Sparkles
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useAppSelector } from '@/store/hooks';
-import gigService from '@/services/gig';
-import { Gig, GigPackage } from '@/types/api';
+import { gigAPI } from '@/services/gig';
+import { Gig } from '@/types/api';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import toast from 'react-hot-toast';
+
+interface GigMedia {
+  url: string;
+}
+
+interface GigPackage {
+  id: number;
+  tier: 'BASIC' | 'STANDARD' | 'PREMIUM';
+  title: string;
+  description: string;
+  priceCents: number;
+  currency: string;
+  deliveryDays: number;
+  revisions: number | null;
+}
 
 interface PackageCardProps {
   package: GigPackage;
@@ -165,6 +181,8 @@ export default function GigDetailsPage() {
   });
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [media, setMedia] = useState<GigMedia[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchGigDetails();
@@ -173,17 +191,22 @@ export default function GigDetailsPage() {
   const fetchGigDetails = async () => {
     try {
       setLoading(true);
-      const [gigResponse, packagesResponse] = await Promise.all([
-        gigService.gigAPI.getGigById(gigId),
-        gigService.gigAPI.getGigPackages(gigId)
+      const [gigResponse, packagesResponse, mediaResponse] = await Promise.all([
+        gigAPI.getGigById(gigId),
+        gigAPI.getGigPackages(gigId),
+        gigAPI.getGigMedia(gigId)
       ]);
       
       setGig(gigResponse);
-      setPackages(packagesResponse);
-      console.log('Gig details:', gigResponse);
-      console.log('Packages:', packagesResponse);
+      setPackages(packagesResponse as GigPackage[]);
+      setMedia(mediaResponse);
+      if (packagesResponse.length > 0) {
+        setSelectedPackage(packagesResponse[0] as GigPackage);
+      }
     } catch (error) {
       console.error('Error fetching gig details:', error);
+      setError('Failed to fetch gig details. Please try again later.');
+      toast.error('Failed to fetch gig details.');
     } finally {
       setLoading(false);
     }
@@ -195,6 +218,12 @@ export default function GigDetailsPage() {
 
   const handleSendProposal = () => {
     if (!selectedPackage) return;
+    
+    if (!isAuthenticated) {
+      toast.error("Please log in to send a proposal.");
+      router.push('/auth/login');
+      return;
+    }
     
     setShowProposalForm(true);
   };
@@ -210,8 +239,9 @@ export default function GigDetailsPage() {
     });
     
     // Show success message and redirect
-    alert('Proposal sent successfully!');
-    router.push('/gigs');
+    toast.success('Proposal sent successfully!');
+    setShowProposalForm(false);
+    router.push('/dashboard');
   };
 
   if (loading) {
@@ -226,11 +256,11 @@ export default function GigDetailsPage() {
     );
   }
 
-  if (!gig) {
+  if (error || !gig) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Gig not found</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{error || 'Gig not found'}</h2>
           <Button onClick={() => router.push('/gigs')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Gigs
@@ -273,59 +303,63 @@ export default function GigDetailsPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-white/20"
+          className="relative bg-cover bg-center bg-no-repeat rounded-3xl shadow-xl p-8 mb-8 border border-white/20 overflow-hidden"
+          style={{ backgroundImage: media.length > 0 ? `url(${media[0].url})` : `url("https://plus.unsplash.com/premium_photo-1757922071537-d4235fd524ac?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D")` }}
         >
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <motion.h1 
-                initial={{ opacity: 0, x: -30 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="text-4xl font-bold text-gray-900 mb-4 leading-tight"
-              >
-                {gig.title}
-              </motion.h1>
-              
-              <div className="flex items-center space-x-6 mb-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg mr-3">
-                    {gig.freelancerInfo?.name ? gig.freelancerInfo.name.charAt(0).toUpperCase() : 'F'}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{gig.freelancerInfo?.name || 'Freelancer'}</p>
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 text-yellow-400 fill-current mr-1" />
-                      <span className="text-sm text-gray-600">{gig.rating || 4.8} (127 reviews)</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/80 to-transparent" />
+          <div className="relative grid grid-cols-1 md:grid-cols-2">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 flex flex-col h-full">
+                <motion.h1 
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  className="text-4xl font-bold text-gray-900 mb-4 leading-tight"
+                >
+                  {gig.title}
+                </motion.h1>
+                
+                <div className="flex items-center space-x-6 mb-6">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg mr-3">
+                      {gig.freelancerInfo?.name ? gig.freelancerInfo.name.charAt(0).toUpperCase() : 'F'}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">{gig.freelancerInfo?.name || 'Freelancer'}</p>
+                      <div className="flex items-center">
+                        <Star className="h-4 w-4 text-yellow-400 fill-current mr-1" />
+                        <span className="text-sm text-gray-600">{gig.rating || 4.8} (127 reviews)</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+                
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.4 }}
+                  className="text-gray-700 leading-relaxed text-lg mb-6 flex-grow"
+                >
+                  {gig.description}
+                </motion.p>
+                
+                {/* Tags */}
+                {gig.tags && gig.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {gig.tags.map((tag, index) => (
+                      <motion.span
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 * index }}
+                        className="px-3 py-1 bg-blue-100/50 text-blue-800 rounded-full text-sm font-medium"
+                      >
+                        {tag}
+                      </motion.span>
+                    ))}
+                  </div>
+                )}
               </div>
-              
-              <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="text-gray-700 leading-relaxed text-lg mb-6"
-              >
-                {gig.description}
-              </motion.p>
-              
-              {/* Tags */}
-              {gig.tags && gig.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {gig.tags.map((tag, index) => (
-                    <motion.span
-                      key={index}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, delay: 0.1 * index }}
-                      className="px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 rounded-full text-sm font-medium"
-                    >
-                      {tag}
-                    </motion.span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </motion.div>
@@ -335,17 +369,18 @@ export default function GigDetailsPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="mb-8"
+          className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-6 border border-white/20 mb-8"
         >
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4 flex items-center justify-center">
-              <Sparkles className="mr-3 h-8 w-8 text-purple-500" />
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Choose Your Perfect Package
             </h2>
-            <p className="text-gray-600 text-lg">Select the package that best fits your needs</p>
+            <p className="text-gray-600 text-sm">
+              Select the package that best fits your needs
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {packages.map((pkg, index) => (
               <PackageCard
                 key={pkg.id}

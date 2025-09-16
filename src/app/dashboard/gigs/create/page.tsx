@@ -27,7 +27,9 @@ import {
   FileText,
   Briefcase,
   X,
-  Check
+  Check,
+  Upload,
+  Image
 } from 'lucide-react';const CreateGigPage = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -40,6 +42,7 @@ import {
     tags: string[];
     startingPrice: string;
     deliveryDays: string;
+    status:  "ACTIVE" | "INACTIVE" | "DRAFT";
     active: boolean;
   }>({
     title: "",
@@ -48,8 +51,12 @@ import {
     tags: [],
     startingPrice: "",
     deliveryDays: "",
+    status: "ACTIVE",
     active: true,
   });
+  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -153,6 +160,38 @@ import {
     setForm({ ...form, tags: currentTags.filter(tag => tag !== tagToRemove) });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File size should be less than 10MB");
+        return;
+      }
+
+      // Check file type (images only)
+      if (!file.type.startsWith('image/')) {
+        setError("Please select an image file");
+        return;
+      }
+
+      setSelectedFile(file);
+      setError("");
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -169,20 +208,56 @@ import {
         return;
       }
 
-      const payload = {
-        ...form,
-        tags: form.tags, // tags is already an array now
+      // Validate required fields
+      if (!form.title.trim()) {
+        setError("Title is required");
+        setLoading(false);
+        return;
+      }
+
+      if (!form.description.trim()) {
+        setError("Description is required");
+        setLoading(false);
+        return;
+      }
+
+      if (!form.category) {
+        setError("Category is required");
+        setLoading(false);
+        return;
+      }
+
+      if (!selectedFile) {
+        setError("Please upload a gig image");
+        setLoading(false);
+        return;
+      }
+
+      // Prepare the gig data as JSON
+      const gigData = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        category: form.category,
+        tags: form.tags,
         startingPrice: Number(form.startingPrice),
         deliveryDays: Number(form.deliveryDays),
+        status: form.status,
+        active: form.active,
       };
 
+      // Create FormData
+      const formData = new FormData();
+      const gigBlob = new Blob([JSON.stringify(gigData)], { type: 'application/json' });
+    formData.append('gig', gigBlob);
+      formData.append('file', selectedFile);
+
       const response = await axios.post(
-        "http://localhost:8080/api/gigs/my-gigs",
-        payload,
+        "http://localhost:8080/api/gigs/create-with-media",
+        formData,
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
+            // Don't set Content-Type manually - let the browser set it with boundary
           },
         }
       );
@@ -513,6 +588,59 @@ import {
                     </p>
                   </motion.div>
 
+                  {/* File Upload Section */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 1.0 }}
+                  >
+                    <label className="flex items-center text-sm font-semibold text-gray-700 mb-3">
+                      <Image className="h-4 w-4 mr-2 text-indigo-500" />
+                      Gig Image *
+                    </label>
+                    
+                    {!filePreview ? (
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                          id="file-upload"
+                        />
+                        <label
+                          htmlFor="file-upload"
+                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-2xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all duration-300 hover:border-indigo-400"
+                        >
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <Upload className="w-8 h-8 mb-2 text-gray-500" />
+                            <p className="mb-2 text-sm text-gray-500">
+                              <span className="font-semibold">Click to upload</span> or drag and drop
+                            </p>
+                            <p className="text-xs text-gray-500">PNG, JPG, JPEG (MAX. 10MB)</p>
+                          </div>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <div className="w-full h-48 rounded-2xl overflow-hidden shadow-lg">
+                          <img
+                            src={filePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeFile}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors duration-200"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+
                   {/* Price and Delivery Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <motion.div
@@ -567,7 +695,7 @@ import {
                   >
                     <Button
                       type="submit"
-                      disabled={loading || !form.category}
+                      disabled={loading || !form.category || !selectedFile}
                       className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white font-bold py-4 px-8 rounded-2xl text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
