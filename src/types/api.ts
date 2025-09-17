@@ -56,6 +56,7 @@ export interface Profile {
 export interface Contract {
   id: number;
   jobId: number;
+  jobTitle: string;
   proposalId: number;
   clientId: number;
   freelancerId: number;
@@ -66,6 +67,10 @@ export interface Contract {
   startDate: string;
   endDate: string;
   termsJson: string;
+  totalMilestones: number;
+  completedMilestones: number;
+  activeMilestones: number;
+  milestones: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -226,4 +231,25 @@ export interface SendMessageRequest {
 export interface CreateConversationRequest {
   participantIds: number[];
   initialMessage?: string;
+}
+
+export interface Event {
+  id: number;
+  roomId: number;
+  title: string;
+  description?: string;
+  eventType: 'MEETING' | 'DEADLINE' | 'MILESTONE' | 'REVIEW';
+  startTime: string;
+  endTime: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateEventRequest {
+  roomId: number;
+  title: string;
+  description?: string;
+  eventType: 'MEETING' | 'DEADLINE' | 'MILESTONE' | 'REVIEW';
+  startTime: string;
+  endTime: string;
 }

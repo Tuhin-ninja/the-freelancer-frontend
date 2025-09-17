@@ -6,8 +6,14 @@ const createContract = async (contractData: any): Promise<Contract> => {
   return data;
 };
 
+const getContractById = async (contractId: string): Promise<Contract> => {
+  const { data } = await api.get(`/api/contracts/${contractId}`);
+  return data;
+};
+
 const contractService = {
   createContract,
+  getContractById,
 };
 
 export default contractService;
