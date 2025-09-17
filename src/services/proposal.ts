@@ -18,7 +18,7 @@ export interface Proposal {
   deliveryDays: number;
   portfolioLinks: string; // Changed from string[] to string
   additionalNotes?: string;
-  status: 'SUBMITTED' | 'PENDING' | 'DECLINED' | 'ACCEPTED' | 'REJECTED';
+  status: 'SUBMITTED' | 'PENDING' | 'DECLINED' | 'ACCEPTED' | 'REJECTED' | 'CONTRACTED';
   createdAt: string;
   updatedAt: string;
   // Freelancer information (populated by backend)
@@ -68,10 +68,10 @@ class ProposalService {
   }
 
   // Accept a proposal (for clients)
-  async acceptProposal(id: number): Promise<Proposal> {
-    const response = await api.post(`/api/proposals/${id}/accept`);
-    return response.data;
-  }
+//   async acceptProposal(id: number): Promise<Proposal> {
+//     const response = await api.post(`/api/proposals/${id}/accept`);
+//     return response.data;
+//   }
 
   // Reject a proposal (for clients)
   async rejectProposal(id: number): Promise<Proposal> {

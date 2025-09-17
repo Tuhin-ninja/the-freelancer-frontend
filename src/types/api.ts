@@ -53,6 +53,23 @@ export interface Profile {
   updatedAt: string;
 }
 
+export interface Contract {
+  id: number;
+  jobId: number;
+  proposalId: number;
+  clientId: number;
+  freelancerId: number;
+  totalAmountCents: number;
+  currency: string;
+  paymentModel: 'FIXED' | 'HOURLY';
+  status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'TERMINATED';
+  startDate: string;
+  endDate: string;
+  termsJson: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Gig {
   id: number;
   title: string;
@@ -104,6 +121,8 @@ export interface Job {
   ndaRequired?: boolean;
   ipAssignment?: boolean;
   status: 'DRAFT' | 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  currency: string;
+  paymentModel: 'FIXED' | 'HOURLY';
   createdAt: string;
   updatedAt: string;
   editedAt?: string;
@@ -126,10 +145,19 @@ export interface Proposal {
   jobId: number;
   freelancerId: number;
   cover: string;
-  totalCents: number;
+  proposedRateCents: number;
   currency: string;
   deliveryDays: number;
   status: 'SUBMITTED' | 'WITHDRAWN' | 'DECLINED' | 'ACCEPTED';
+  freelancerInfo?: {
+    name: string;
+    profile?: {
+      headline: string;
+      reviewAvg: number;
+      reviewsCount: number;
+      deliveryScore: number;
+    }
+  };
   createdAt: string;
   updatedAt: string;
 }

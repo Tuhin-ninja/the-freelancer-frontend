@@ -37,6 +37,9 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import contractService from '@/services/contract';
+
+type ProposalWithContract = Proposal & { contractId?: number };
 
 export default function JobDetailsPage() {
   const router = useRouter();
@@ -45,9 +48,11 @@ export default function JobDetailsPage() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   
   const [job, setJob] = useState<Job | null>(null);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposals, setProposals] = useState<ProposalWithContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [acceptingProposalId, setAcceptingProposalId] = useState<number | null>(null);
+  const [freelancer, setFreelancer] = useState();
 
   // Safe date formatting utility
   const safeFormatDate = (dateString: string | undefined) => {
@@ -74,6 +79,7 @@ export default function JobDetailsPage() {
     try {
       setLoading(true);
       const response = await jobService.jobAPI.getJobById(parseInt(jobId));
+    //   const response2 = await authAPI.getUserById(response.freelancerId);
       setJob(response);
     } catch (error) {
       console.error('Error fetching job:', error);
@@ -85,6 +91,7 @@ export default function JobDetailsPage() {
   const fetchProposals = async () => {
     try {
       const response = await proposalService.getJobProposals(parseInt(jobId));
+      console.log(response);
       setProposals(response);
     } catch (error) {
       console.error('Error fetching proposals:', error);
@@ -94,40 +101,77 @@ export default function JobDetailsPage() {
     }
   };
 
-  const handleAcceptProposal = async (proposalId: number) => {
+  const handleAcceptProposal = async (proposal: Proposal) => {
+    if (!job || !user) {
+      toast.error('Job or user data is not available.');
+      return;
+    }
+
+    setAcceptingProposalId(proposal.id);
     try {
-      await proposalService.acceptProposal(proposalId);
-      
-      // Update the proposal in the local state to PENDING (accepted by client)
-      setProposals(prev => prev.map(p => 
-        p.id === proposalId ? { ...p, status: 'PENDING' as const } : p
+      // First, accept the proposal
+    //   await proposalService.acceptProposal(proposal.id);
+
+      // Then, create the contract
+      const today = new Date();
+      const endDate = new Date();
+      endDate.setDate(today.getDate() + 30); // Default 30 day contract
+
+      const contractData = {
+        jobId: job.id,
+        proposalId: proposal.id,
+        clientId: job.clientId,
+        freelancerId: proposal.freelancerId,
+        totalAmountCents: proposal.proposedRate,
+        currency: job.currency,
+        paymentModel: job.paymentModel,
+        startDate: today.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        termsJson: JSON.stringify({
+          scope: `Work for job: ${job.title}`,
+          timeline: 'As per job description',
+        }),
+      };
+
+      const newContract = await contractService.createContract(contractData);
+
+      // Update the proposal in the local state to ACCEPTED and add contractId
+      setProposals(prev => prev.map(p =>
+        p.id === proposal.id ? { ...p, status: 'ACCEPTED' as const, contractId: newContract.id } : p
       ));
+
+      toast.success('Proposal accepted and contract created!');
       
-      toast.success('Proposal accepted successfully!');
+      // Optional: redirect to workspace immediately
+      // router.push(`/workspace/${newContract.id}`);
+
     } catch (error: any) {
-      console.error('Error accepting proposal:', error);
-      toast.error(error.response?.data?.message || 'Failed to accept proposal');
+      console.error('Error accepting proposal or creating contract:', error);
+      toast.error(error.response?.data?.message || 'Failed to finalize the agreement.');
+    } finally {
+      setAcceptingProposalId(null);
     }
   };
 
-  const handleRejectProposal = async (proposalId: number) => {
-    try {
-      await proposalService.rejectProposal(proposalId);
+//   const handleRejectProposal = async (proposalId: number) => {
+//     try {
+//       await proposalService.rejectProposal(proposalId);
       
-      // Update the proposal in the local state to DECLINED (rejected by client)
-      setProposals(prev => prev.map(p => 
-        p.id === proposalId ? { ...p, status: 'DECLINED' as const } : p
-      ));
+//       // Update the proposal in the local state to DECLINED (rejected by client)
+//       setProposals(prev => prev.map(p => 
+//         p.id === proposalId ? { ...p, status: 'DECLINED' as const } : p
+//       ));
       
-      toast.success('Proposal declined');
-    } catch (error: any) {
-      console.error('Error rejecting proposal:', error);
-      toast.error(error.response?.data?.message || 'Failed to decline proposal');
-    }
-  };
+//       toast.success('Proposal declined');
+//     } catch (error: any) {
+//       console.error('Error rejecting proposal:', error);
+//       toast.error(error.response?.data?.message || 'Failed to decline proposal');
+//     }
+//   };
 
   // Facebook-style Proposal Card Component
-  const ProposalCard = ({ proposal }: { proposal: Proposal }) => {
+  const ProposalCard = ({ proposal }: { proposal: ProposalWithContract }) => {
+    console.log("Khaid hasan Tuhin - ",proposal);
     const [isLiked, setIsLiked] = useState(false);
     const [showFullCover, setShowFullCover] = useState(false);
     const [showPortfolio, setShowPortfolio] = useState(false);
@@ -217,10 +261,10 @@ export default function JobDetailsPage() {
             
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 text-center">
               <div className={`text-2xl font-bold ${
-                proposal.status === 'PENDING' ? 'text-yellow-600' :
-                proposal.status === 'ACCEPTED' ? 'text-green-600' : 'text-red-600'
+                proposal.status === 'SUBMITTED' ? 'text-yellow-600' :
+                proposal.status === 'CONTRACTED' ? 'text-green-600' : 'text-red-600'
               }`}>
-                {proposal.status}
+                {proposal.status} 
               </div>
               <div className="text-sm text-gray-700">Status</div>
             </div>
@@ -324,17 +368,24 @@ export default function JobDetailsPage() {
           {proposal.status === 'SUBMITTED' ? (
             <div className="flex space-x-4">
               <Button
-                onClick={() => handleAcceptProposal(proposal.id)}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => handleAcceptProposal(proposal)}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+                disabled={acceptingProposalId === proposal.id}
               >
-                ACCEPT
-              </Button>
-              
-              <Button
-                onClick={() => handleRejectProposal(proposal.id)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-              >
-                REJECT
+                {acceptingProposalId === proposal.id ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Accepting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Accept & Hire
+                  </>
+                )}
               </Button>
             </div>
           ) : proposal.status === 'PENDING' ? (
@@ -357,6 +408,16 @@ export default function JobDetailsPage() {
                 <CheckCircle className="w-5 h-5" />
                 <span className="font-semibold">ACCEPTED</span>
               </div>
+            </div>
+          ) : proposal.status === 'CONTRACTED' ? (
+            <div className="flex items-center justify-center py-3">
+              <Button
+                onClick={() => router.push(`/workspace/${proposal.contractId || proposal.id}`)}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full font-semibold"
+              >
+                <Briefcase className="w-5 h-5 mr-2" />
+                Go to Workspace
+              </Button>
             </div>
           ) : proposal.status === 'REJECTED' ? (
             <div className="flex items-center justify-center py-3">
