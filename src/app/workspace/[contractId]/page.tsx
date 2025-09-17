@@ -18,13 +18,15 @@ const WorkspacePage = () => {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [roomId, setRoomId] = useState<string | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
     useEffect(() => {
         const fetchWorkspace = async () => {
             if (contractId) {
                 try {
                     const workspace = await workspaceService.getWorkspaceByContractId(contractId);
-                    setRoomId(workspace.roomId);
+                    console.log(workspace.id);
+                    setRoomId(workspace.id);
                 } catch (error) {
                     console.error('Error fetching workspace details:', error);
                     toast.error('Failed to load workspace details.');
@@ -36,9 +38,56 @@ const WorkspacePage = () => {
 
     useEffect(() => {
         if (activeTab === 'files' && roomId) {
-            fetchFiles();
+            fetchFiles(); 
         }
     }, [activeTab, roomId]);
+
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const newFiles = event.target.files ? Array.from(event.target.files) : [];
+        if (newFiles.length === 0) return;
+
+        const allFiles = [...selectedFiles, ...newFiles];
+        setSelectedFiles(allFiles);
+
+        // Clear the file input for next selection
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleRemoveFile = (index: number) => {
+        setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
+    };
+
+    const handleUpload = async () => {
+        if (selectedFiles.length === 0) {
+            toast.error("Please select files to upload.");
+            return;
+        }
+        if (!roomId) {
+            toast.error("Workspace not loaded yet. Please wait.");
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const uploadPromises = selectedFiles.map(file => 
+                fileService.uploadFile(roomId, file)
+            );
+            
+            const uploadedFiles = await Promise.all(uploadPromises);
+            
+            setFiles(prev => [...prev, ...uploadedFiles]);
+            setSelectedFiles([]);
+            toast.success(`${uploadedFiles.length} file(s) uploaded successfully!`);
+
+        } catch (error) {
+            console.error('Error uploading files:', error);
+            toast.error('Failed to upload files. Please try again.');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const fetchFiles = async () => {
         if (!roomId) return;
@@ -83,7 +132,18 @@ const WorkspacePage = () => {
 
     const handleFileDownload = async (file: WorkspaceFile) => {
         try {
-            await fileService.downloadFile(file.id);
+            // For local files, we use the anchor tag download.
+            // The real download service is for API-based downloads.
+            if (file.fileUrl.startsWith('blob:')) {
+                const link = document.createElement('a');
+                link.href = file.fileUrl;
+                link.setAttribute('download', file.fileName);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                await fileService.downloadFile(file.id);
+            }
             toast.success(`${file.fileName} downloaded successfully!`);
         } catch (error) {
             console.error('Error downloading file:', error);
@@ -130,17 +190,17 @@ const WorkspacePage = () => {
                         <h2 className="text-gray-800 text-2xl font-bold mb-6">Project Files</h2>
                         
                         {/* Upload Section - Only for Freelancers */}
-                        {user?.role === 'freelancer' && (
-                            <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-dashed border-blue-300">
-                                <div className="text-center">
+                        {user && (
+                            <div className="mb-8">
+                                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-dashed border-blue-300 text-center">
                                     <Upload className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Upload Project Files</h3>
-                                    <p className="text-gray-600 mb-4">Share your work, drafts, and deliverables with the client</p>
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Select Files to Upload</h3>
+                                    <p className="text-gray-600 mb-4">You can select multiple files at once.</p>
                                     
                                     <input
                                         type="file"
                                         ref={fileInputRef}
-                                        onChange={handleFileUpload}
+                                        onChange={handleFileSelect}
                                         className="hidden"
                                         multiple
                                         accept="*/*"
@@ -148,30 +208,72 @@ const WorkspacePage = () => {
                                     
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
-                                        disabled={uploading}
-                                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                                     >
-                                        {uploading ? (
-                                            <span className="flex items-center">
-                                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                Uploading...
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center">
-                                                <Upload className="w-5 h-5 mr-2" />
-                                                Choose Files
-                                            </span>
-                                        )}
+                                        <span className="flex items-center">
+                                            <File className="w-5 h-5 mr-2" />
+                                            Choose Files
+                                        </span>
                                     </button>
-                                    <p className="text-sm text-gray-500 mt-2">Support all file types, max 50MB per file</p>
                                 </div>
+
+                                {selectedFiles.length > 0 && (
+                                    <div className="mt-6">
+                                        <h4 className="font-semibold text-gray-700 mb-3">Files to Upload ({selectedFiles.length})</h4>
+                                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                                            {selectedFiles.map((file, index) => (
+                                                <motion.div
+                                                    key={index}
+                                                    initial={{ opacity: 0, x: -20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    className="flex items-center justify-between bg-gray-100 p-3 rounded-lg"
+                                                >
+                                                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                                        {file.type.startsWith('image/') ? (
+                                                            <img src={URL.createObjectURL(file)} alt="preview" className="w-10 h-10 rounded-md object-cover" />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-md bg-gray-200 flex items-center justify-center">
+                                                                <FileText className="w-5 h-5 text-gray-500" />
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                                                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => handleRemoveFile(index)} className="p-1 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                        <button
+                                            onClick={handleUpload}
+                                            disabled={uploading}
+                                            className="w-full mt-4 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                        >
+                                            {uploading ? (
+                                                <>
+                                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Uploading...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Upload className="w-5 h-5 mr-2" />
+                                                    Upload {selectedFiles.length} File(s)
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Files List */}
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">Uploaded Files</h3>
                         <div className="space-y-3">
                             {files.length === 0 ? (
                                 <div className="text-center py-12">
@@ -193,30 +295,37 @@ const WorkspacePage = () => {
                                         className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                                     >
                                         <div className="flex items-center justify-between">
-                                            <div className="flex items-center space-x-4 flex-1">
+                                            <div className="flex items-center space-x-4 flex-1 min-w-0">
                                                 <div className="text-2xl">
-                                                    {getFileIcon(file.fileType)}
+                                                    {file.contentType.startsWith('image/') ? (
+                                                        <img src={file.thumbnailUrl} alt={file.originalFilename} className="w-12 h-12 rounded-lg object-cover" />
+                                                    ) : (
+                                                        getFileIcon(file.contentType)
+                                                    )}
                                                 </div>
-                                                <div className="flex-1">
-                                                    <h4 className="font-medium text-gray-900 truncate">{file.fileName}</h4>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-medium text-gray-900 truncate">{file.originalFilename}</h4>
                                                     <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                                                         <span>{formatFileSize(file.fileSize)}</span>
                                                         <span>•</span>
-                                                        <span>{new Date(file.uploadedAt).toLocaleDateString()}</span>
+                                                        <span>{new Date(file.createdAt).toLocaleDateString()}</span>
                                                         <span>•</span>
-                                                        <span>by {file.uploadedBy === user?.id ? 'You' : 'Other user'}</span>
+                                                        <span>by {file.uploaderId === user?.id ? 'You' : 'Other user'}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             
                                             <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={() => handleFileDownload(file)}
+                                                <a
+                                                    href={file.url}
+                                                    download={file.originalFilename}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
                                                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                     title="Download file"
                                                 >
                                                     <Download className="w-5 h-5" />
-                                                </button>
+                                                </a>
                                             </div>
                                         </div>
                                     </motion.div>

@@ -5,12 +5,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and set Content-Type
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -20,6 +17,16 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+
+    // Do not set Content-Type for FormData
+    if (config.data instanceof FormData) {
+      // Let the browser set the Content-Type for FormData
+      delete config.headers['Content-Type'];
+    } else if (!config.headers['Content-Type']) {
+      // Set Content-Type for other requests if not already set
+      config.headers['Content-Type'] = 'application/json';
+    }
+
     return config;
   },
   (error) => {

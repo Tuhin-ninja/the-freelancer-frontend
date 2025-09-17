@@ -1,33 +1,33 @@
 import api from '@/lib/api';
 
 export interface WorkspaceFile {
-  id: number;
-  contractId: number;
-  fileName: string;
-  fileUrl: string;
-  fileSize: number;
-  uploadedBy: number;
-  uploadedAt: string;
-  fileType: string;
+    id: number;
+    roomId: number;
+    uploaderId: number;
+    filename: string;
+    originalFilename: string;
+    url: string;
+    thumbnailUrl: string;
+    cloudinaryPublicId: string;
+    cloudinaryResourceType: string;
+    contentType: string;
+    fileSize: number;
+    milestoneId: number | null;
+    checksum: string;
+    createdAt: string;
 }
 
 const uploadFile = async (roomId: string, file: File): Promise<WorkspaceFile> => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const config = {
-    headers: {
-      // Don't set Content-Type, let browser set it for multipart/form-data
-    },
-  };
-
-  const { data } = await api.post(`/api/workspaces/rooms/${roomId}/files/multipart`, formData, config);
+  const { data } = await api.post(`/api/workspaces/rooms/${roomId}/files/multipart`, formData);
   return data;
 };
 
 const getContractFiles = async (roomId: string): Promise<WorkspaceFile[]> => {
   const { data } = await api.get(`/api/workspaces/rooms/${roomId}/files`);
-  return data;
+  return data.content;
 };
 
 const downloadFile = async (fileId: number): Promise<void> => {

@@ -12,6 +12,7 @@ export interface ProposalData {
 export interface Proposal {
   id: number;
   jobId: number;
+  jobTitle?: string; // Optional job title for display
   freelancerId: number;
   coverLetter: string;
   proposedRate: number;
@@ -21,6 +22,7 @@ export interface Proposal {
   status: 'SUBMITTED' | 'PENDING' | 'DECLINED' | 'ACCEPTED' | 'REJECTED' | 'CONTRACTED';
   createdAt: string;
   updatedAt: string;
+  contractId?: number; // Populated when proposal is accepted and contract is created   
   // Freelancer information (populated by backend)
   freelancerInfo?: {
     id: number;
