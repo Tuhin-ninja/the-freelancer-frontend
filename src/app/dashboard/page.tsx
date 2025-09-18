@@ -59,8 +59,11 @@ const DashboardPage = () => {
 
     };
 
-    if (user.role === 'FREELANCER') fetchGigs();
-    else fetchJobs();
+    if (user.role === 'freelancer') {
+      fetchGigs();
+    } else {
+      fetchJobs();
+    }
   }, [user]);
 
   return (
@@ -90,13 +93,13 @@ const DashboardPage = () => {
             Welcome back, {user?.name || 'User'}!
           </motion.h1>
           <p className="text-gray-600 text-lg">
-            {user?.role === 'FREELANCER' ? 'Ready to showcase your skills?' : 'Ready to find the perfect FREELANCER?'}
+            {user?.role === 'freelancer' ? 'Ready to showcase your skills?' : 'Ready to find the perfect FREELANCER?'}
           </p>
         </motion.div>
 
         {/* Role-based Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {user?.role === 'FREELANCER' ? (
+          {user?.role === 'freelancer' ? (
             // FREELANCER Actions
             <>
               <motion.div
@@ -174,6 +177,7 @@ const DashboardPage = () => {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 whileHover={{ scale: 1.05, rotateY: 5 }}
                 className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-2xl p-6 shadow-xl cursor-pointer"
+                onClick={() => router.push('/dashboard/projects')}
               >
                 <div className="flex items-center mb-4">
                   <div className="bg-white/20 p-3 rounded-full">
@@ -204,7 +208,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Content Section */}
-        {user?.role === 'FREELANCER' ? (
+        {user?.role === 'freelancer' ? (
           /* FREELANCER's Gigs Section */
           <motion.div
             initial={{ opacity: 0, y: 20 }}
