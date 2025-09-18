@@ -59,7 +59,7 @@ const DashboardPage = () => {
 
     };
 
-    if (user.role === 'freelancer') {
+    if (user.role === 'FREELANCER') {
       fetchGigs();
     } else {
       fetchJobs();
@@ -93,13 +93,13 @@ const DashboardPage = () => {
             Welcome back, {user?.name || 'User'}!
           </motion.h1>
           <p className="text-gray-600 text-lg">
-            {user?.role === 'freelancer' ? 'Ready to showcase your skills?' : 'Ready to find the perfect FREELANCER?'}
+            {user?.role === 'FREELANCER' ? 'Ready to showcase your skills?' : 'Ready to find the perfect FREELANCER?'}
           </p>
         </motion.div>
 
         {/* Role-based Action Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {user?.role === 'freelancer' ? (
+          {user?.role === 'FREELANCER' ? (
             // FREELANCER Actions
             <>
               <motion.div
@@ -208,7 +208,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Content Section */}
-        {user?.role === 'freelancer' ? (
+        {user?.role === 'FREELANCER' ? (
           /* FREELANCER's Gigs Section */
           <motion.div
             initial={{ opacity: 0, y: 20 }}

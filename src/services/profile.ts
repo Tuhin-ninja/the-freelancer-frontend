@@ -18,6 +18,17 @@ export const updateProfilePicture = async (file: File): Promise<User> => {
 };
 
 export const getProfile = async (userId: string): Promise<any> => {
-  const { data } = await api.get(`/api/profiles/${userId}`);
+  try {
+    const { data } = await api.get(`/api/profiles/${userId}`);
+    console.log('Raw API response for profile:', data);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching profile:', error);
+    throw new Error(error.response?.data?.message || error.message || 'Failed to fetch profile');
+  }
+};
+
+export const updateProfile = async (profileData: any): Promise<any> => {
+  const { data } = await api.put('/api/profiles/me', profileData);
   return data;
 };
