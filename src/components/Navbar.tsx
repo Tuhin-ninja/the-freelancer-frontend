@@ -15,14 +15,42 @@ import {
   Menu,
   Briefcase,
   UserCircle,
-  PlusCircle
+  PlusCircle,
+  FileText
 } from 'lucide-react';
 
 const Navbar = () => {
   const [showDropdown, setShowDropdown] = React.useState(false);
+  const [userProfile, setUserProfile] = React.useState<any>(null);
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+
+  // Fetch complete user profile data including profile picture
+  React.useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`http://localhost:8080/api/auth/public/users/${user.id}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const profileData = await response.json();
+            console.log('Navbar fetched user profile:', profileData);
+            setUserProfile(profileData);
+          }
+        } catch (error) {
+          console.error('Error fetching user profile for navbar:', error);
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [user?.id]);
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
@@ -40,7 +68,7 @@ const Navbar = () => {
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center space-x-3">
               <Briefcase className="h-10 w-10 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">FreelanceHub</span>
+              <span className="text-2xl font-bold text-gray-900">NeoLancer</span>
             </Link>
 
             <div className="hidden md:ml-8 md:flex md:space-x-12">
@@ -93,7 +121,7 @@ const Navbar = () => {
                     onClick={() => setShowDropdown((prev) => !prev)}
                   >
                     <img
-                      src="https://images.unsplash.com/photo-1755278338891-e8d8481ff087?q=80&w=3072&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                      src={userProfile?.profilePictureUrl || user?.profilePictureUrl || user?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`}
                       alt="Profile"
                       className="object-cover w-12 h-12 rounded-full"
                     />
@@ -103,7 +131,7 @@ const Navbar = () => {
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 transition-all duration-200 z-50">
                       <div className="py-4 px-4 flex flex-col items-center">
                         <img
-                          src="https://images.unsplash.com/photo-1755278338891-e8d8481ff087?q=80&w=3072&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                          src={userProfile?.profilePictureUrl || user?.profilePictureUrl || user?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`}
                           alt="Profile"
                           className="object-cover h-12 w-12 rounded-full mb-2"
                         />
@@ -126,6 +154,14 @@ const Navbar = () => {
                             <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
                               <Briefcase className="mr-2 h-4 w-4" />
                               My Proposals
+                            </button>
+                          </Link>
+                        )}
+                        {user?.role === 'CLIENT' && (
+                          <Link href="/contracts" className="w-full">
+                            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                              <FileText className="mr-2 h-4 w-4" />
+                              My Contracts
                             </button>
                           </Link>
                         )}

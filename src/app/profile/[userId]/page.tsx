@@ -25,11 +25,14 @@ import {
   Edit3,
   AlertTriangle,
   CreditCard,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { getProfile, updateProfilePicture } from '@/services/profile';
 import { gigAPI } from '@/services/gig';
 import stripeAPI from '@/services/stripe';
+import ReviewService, { Review } from '@/services/review';
+import userService from '@/services/user';
 import { updateUser } from '@/store/authSlice';
 import { useRouter } from 'next/navigation';
 
@@ -53,6 +56,13 @@ interface ProfileData {
   updatedAt?: string;
 }
 
+interface ReviewWithClient extends Review {
+  clientName?: string;
+  clientLoading?: boolean;
+}
+
+
+
 const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) => {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -66,6 +76,10 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
   const [userId, setUserId] = useState<string | null>(null);
   const [gigs, setGigs] = useState<any[]>([]);
   const [gigsLoading, setGigsLoading] = useState(false);
+
+  // Reviews state
+  const [reviews, setReviews] = useState<ReviewWithClient[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Stripe Connect states
   const [isConnectingStripe, setIsConnectingStripe] = useState(false);
@@ -120,11 +134,13 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
           
           if (data.user) {
             setUser(data.user);
-            console.log(user);
+            console.log('User data from API:', data.user);
+            console.log('User role:', data.user.role);
             setIsOwnProfile(loggedInUser?.id === data.user.id);
           } else if (loggedInUser && userId === String(loggedInUser.id)) {
             // If no user data returned but this is the logged-in user's profile
             setUser(loggedInUser);
+            console.log('Using logged in user data:', loggedInUser);
             setIsOwnProfile(true);
           }
         } else {
@@ -171,6 +187,77 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
     fetchUserGigs();
   }, [userId]);
+
+  // Fetch FREELANCER reviews
+  useEffect(() => {
+    const fetchFREELANCERReviews = async () => {
+      console.log('Reviews fetch useEffect triggered:', { userId, user: user?.role, userObj: user });
+      
+      if (!userId || !user) {
+        console.log('Skipping reviews fetch:', { 
+          hasUserId: !!userId, 
+          hasUser: !!user, 
+          userRole: user?.role,
+          isFREELANCER: user?.role === 'FREELANCER'
+        });
+        return;
+      }
+
+      // Always fetch reviews regardless of role for now to debug
+      if (user.role !== 'FREELANCER') {
+        console.log('User is not a FREELANCER, role:', user.role);
+      }
+
+      try {
+        console.log('Fetching reviews for FREELANCER:', userId);
+        setReviewsLoading(true);
+        const reviewsData = await ReviewService.getFreelancerReviews(parseInt(userId));
+        console.log('FREELANCER reviews API response:', reviewsData);
+        
+        // Convert to ReviewWithClient and set initial state
+        const reviewsWithClient: ReviewWithClient[] = reviewsData.map(review => ({
+          ...review,
+          clientName: undefined,
+          clientLoading: true
+        }));
+        
+        setReviews(reviewsWithClient);
+        
+        // Fetch client names for each review
+        const updatedReviews = await Promise.all(
+          reviewsWithClient.map(async (review) => {
+            try {
+              console.log(`Fetching client data for reviewerId: ${review.reviewerId}`);
+              const clientData = await userService.getUserById(review.reviewerId);
+              console.log(`Client data for reviewerId ${review.reviewerId}:`, clientData);
+              return {
+                ...review,
+                clientName: clientData.name || 'Anonymous Client',
+                clientLoading: false
+              };
+            } catch (error) {
+              console.error(`Error fetching client data for reviewerId ${review.reviewerId}:`, error);
+              return {
+                ...review,
+                clientName: 'Anonymous Client',
+                clientLoading: false
+              };
+            }
+          })
+        );
+        
+        console.log('Final reviews with client names:', updatedReviews);
+        setReviews(updatedReviews);
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+        setReviews([]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchFREELANCERReviews();
+  }, [userId, user]);
 
   // Handle Stripe onboarding callback
   useEffect(() => {
@@ -548,7 +635,8 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             {isOwnProfile && 
              !stripeStatusLoading && 
              stripeStatus && 
-             !stripeStatus.hasStripeAccount && (
+             !stripeStatus.hasStripeAccount && 
+             loggedInUser?.role === 'FREELANCER' && (
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -636,7 +724,8 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             {isOwnProfile && 
              !stripeStatusLoading && 
              stripeStatus && 
-             stripeStatus.hasStripeAccount && (
+             stripeStatus.hasStripeAccount && 
+             loggedInUser?.role === 'FREELANCER' && (
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -766,13 +855,173 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
               </motion.div>
             </div>
 
+            {/* Reviews Section - Only for FREELANCERs */}
+            {user?.role === 'FREELANCER' && (
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.95 }}
+                className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-8"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                    <Star className="h-6 w-6 text-yellow-500" />
+                    Client Reviews
+                  </h2>
+                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                    {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
+                  </span>
+                </div>
+                
+                {reviewsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+                    <span className="ml-3 text-gray-600">Loading reviews...</span>
+                  </div>
+                ) : reviews.length > 0 ? (
+                  <div className="space-y-6">
+                    {reviews.map((review, index) => (
+                      <motion.div
+                        key={review.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 * index }}
+                        className="border border-gray-200 rounded-xl p-6 bg-white"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-5 w-5 ${
+                                    star <= review.overallRating
+                                      ? 'text-yellow-400 fill-current'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-lg font-semibold text-gray-900">
+                              {review.overallRating}.0
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center gap-2 justify-end mb-1">
+                              <User className="h-4 w-4 text-gray-400" />
+                              {review.clientLoading ? (
+                                <div className="animate-pulse bg-gray-200 rounded h-4 w-20"></div>
+                              ) : (
+                                <span className="text-sm font-medium text-gray-700">
+                                  {review.clientName || 'Anonymous Client'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">
+                              {new Date(review.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          {review.title}
+                        </h3>
+                        
+                        <p className="text-gray-700 leading-relaxed mb-4">
+                          {review.comment}
+                        </p>
+                        
+                        {/* Detailed Ratings */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+                          <div className="text-center">
+                            <div className="text-sm text-gray-600">Quality</div>
+                            <div className="font-semibold text-blue-600">{review.qualityRating}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-sm text-gray-600">Communication</div>
+                            <div className="font-semibold text-green-600">{review.communicationRating}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-sm text-gray-600">Timeliness</div>
+                            <div className="font-semibold text-orange-600">{review.timelinessRating}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-sm text-gray-600">Professionalism</div>
+                            <div className="font-semibold text-purple-600">{review.professionalismRating}</div>
+                          </div>
+                        </div>
+                        
+                        {review.wouldRecommend && (
+                          <div className="mt-4 flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Would recommend this FREELANCER</span>
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Star className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Reviews Yet</h3>
+                    <p className="text-gray-600">
+                      {isOwnProfile 
+                        ? "You haven't received any reviews yet. Complete some projects to start building your reputation!" 
+                        : "This FREELANCER hasn't received any reviews yet."
+                      }
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Client Contracts Section */}
+            {isOwnProfile && user?.role === 'client' && (
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.95 }}
+                className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-8"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                    <FileText className="h-6 w-6 text-green-600" />
+                    My Contracts
+                  </h2>
+                </div>
+                
+                <div className="text-center py-8">
+                  <FileText className="h-16 w-16 text-green-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Manage Your Contracts
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    View and manage all your active and completed contracts with FREELANCERs.
+                  </p>
+                  <button
+                    onClick={() => router.push('/contracts')}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-300 shadow-lg font-semibold"
+                  >
+                    <FileText className="h-5 w-5" />
+                    View My Contracts
+                    <ExternalLink className="h-4 w-4" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Gigs Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 1.0 }}
-              className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-8"
-            >
+            {user?.role === 'FREELANCER' && (
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 1.0 }}
+                className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-8"
+              >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
                   <Briefcase className="h-6 w-6 text-blue-600" />
@@ -862,12 +1111,13 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                   <p className="text-gray-600">
                     {isOwnProfile 
                       ? "You haven't posted any gigs yet." 
-                      : "This freelancer hasn't posted any gigs yet."
+                      : "This FREELANCER hasn't posted any gigs yet."
                     }
                   </p>
                 </div>
               )}
             </motion.div>
+            )}
 
           </div>
         </div>

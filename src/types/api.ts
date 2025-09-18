@@ -12,6 +12,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   profilePicture?: string; // Optional profile picture property
+  profilePictureUrl?: string; // Alternative field name used by some APIs
   stripeAccountId?: string | null; // Stripe account ID for payments
 }
 

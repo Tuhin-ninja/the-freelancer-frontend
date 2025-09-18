@@ -11,9 +11,15 @@ const getContractById = async (contractId: string): Promise<Contract> => {
   return data;
 };
 
+const getMyContracts = async (): Promise<Contract[]> => {
+  const { data } = await api.get('/api/contracts/my-contracts');
+  return data;
+};
+
 const contractService = {
   createContract,
   getContractById,
+  getMyContracts,
 };
 
 export default contractService;

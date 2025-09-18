@@ -20,14 +20,15 @@ export default function MyProposalsPage() {
       try {
         setLoading(true);
         const data = await proposalService.getMyProposals();
+        console.log('Proposals data:', data); // Debug log to see what we're getting
         setProposals(data);
-      } catch (err) {
-        setError('Failed to fetch proposals. Please try again later.');
-        console.error(err);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load proposals');
       } finally {
         setLoading(false);
       }
     };
+
     fetchProposals();
   }, []);
 
@@ -122,13 +123,22 @@ export default function MyProposalsPage() {
                     </div>
                   </div>
                 </div>
-                {proposal.status === 'CONTRACTED' && proposal.contractId && (
+                {proposal.status === "CONTRACTED" && (
                   <div className="bg-gray-50 px-6 py-3">
-                    <Link href={`/workspace/${proposal.contractId}`}>
-                      <Button variant="link" className="p-0 h-auto text-blue-600">
-                        Go to Workspace <ArrowRight className="ml-1 h-4 w-4" />
-                      </Button>
-                    </Link>
+                    {proposal.contractId ? (
+                      <Link href={`/workspace/${proposal.contractId}`}>
+                        <Button variant="link" className="p-0 h-auto text-blue-600">
+                          Go to Workspace <ArrowRight className="ml-1 h-4 w-4" />
+                        </Button>
+                      </Link>
+                    ) : (
+                      <div className="text-sm text-gray-600">
+                        Workspace is being prepared...
+                        <Button variant="link" className="p-0 h-auto text-gray-600 ml-2" disabled>
+                          Setting up workspace
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>

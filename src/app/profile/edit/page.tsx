@@ -144,7 +144,7 @@ const EditProfilePage = () => {
       await updateProfile(profileUpdateData);
       setSuccess(true);
       setTimeout(() => {
-        router.push(`/profile`);
+        router.push(`/profile/${user?.id}`);
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Failed to update profile.');
