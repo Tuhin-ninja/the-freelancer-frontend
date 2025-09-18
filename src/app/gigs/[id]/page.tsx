@@ -78,6 +78,7 @@ const PackageCard = ({ package: pkg, index, onSelect, selected }: PackageCardPro
 
   const config = tierColors[pkg.tier] || tierColors.BASIC;
   const IconComponent = config.icon;
+  // console.log(gig);
 
   return (
     <motion.div
@@ -198,6 +199,7 @@ export default function GigDetailsPage() {
       ]);
       
       setGig(gigResponse);
+      console.log(gig);
       setPackages(packagesResponse as GigPackage[]);
       setMedia(mediaResponse);
       if (packagesResponse.length > 0) {

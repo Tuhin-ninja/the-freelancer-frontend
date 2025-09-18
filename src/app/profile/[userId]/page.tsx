@@ -22,9 +22,13 @@ import {
   Github,
   Linkedin,
   ArrowLeft,
-  Edit3
+  Edit3,
+  AlertTriangle,
+  CreditCard,
+  ExternalLink
 } from 'lucide-react';
 import { getProfile, updateProfilePicture } from '@/services/profile';
+import { gigAPI } from '@/services/gig';
 import { updateUser } from '@/store/authSlice';
 import { useRouter } from 'next/navigation';
 
@@ -59,6 +63,8 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
   const [error, setError] = useState<string | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [gigs, setGigs] = useState<any[]>([]);
+  const [gigsLoading, setGigsLoading] = useState(false);
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -122,6 +128,37 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
     fetchProfileData();
   }, [userId, loggedInUser]);
+
+  // Fetch user's gigs
+  useEffect(() => {
+    const fetchUserGigs = async () => {
+      if (!userId) return;
+
+      try {
+        setGigsLoading(true);
+        const response = await fetch(`http://localhost:8080/api/gigs/user/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const gigsData = await response.json();
+          console.log('User gigs:', gigsData);
+          setGigs(gigsData || []);
+        } else {
+          console.error('Failed to fetch gigs:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching gigs:', error);
+      } finally {
+        setGigsLoading(false);
+      }
+    };
+
+    fetchUserGigs();
+  }, [userId]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -338,6 +375,73 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
               </div>
             </motion.div>
 
+            {/* Stripe Account Warning */}
+            {isOwnProfile && (!user?.stripeAccountId || user?.stripeAccountId === null) && (
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl shadow-xl p-6"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <AlertTriangle className="h-8 w-8 text-amber-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-amber-800 mb-2 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Stripe Account Required
+                    </h3>
+                    <p className="text-amber-700 mb-4 leading-relaxed">
+                      To receive payments for your freelance work and gigs, you need to connect your Stripe account. 
+                      This allows clients to pay you securely and helps you manage your earnings.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        onClick={() => {
+                          // You can implement Stripe Connect flow here
+                          window.open('https://connect.stripe.com', '_blank');
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-all duration-300 shadow-lg font-semibold"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Connect Stripe Account
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => router.push('/profile/edit')}
+                        className="flex items-center gap-2 px-6 py-3 bg-white text-amber-700 border-2 border-amber-300 rounded-xl hover:bg-amber-50 transition-all duration-300 font-semibold"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        Update Profile
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 p-4 bg-amber-100 rounded-xl border border-amber-200">
+                  <h4 className="font-semibold text-amber-800 mb-2">Benefits of connecting Stripe:</h4>
+                  <ul className="text-sm text-amber-700 space-y-1">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Secure payment processing
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Automatic invoicing and receipts
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Quick payouts to your bank account
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Professional payment experience for clients
+                    </li>
+                  </ul>
+                </div>
+              </motion.div>
+            )}
+
             {/* Quick Stats */}
             <motion.div
               initial={{ opacity: 0, x: -30 }}
@@ -437,6 +541,109 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                 </div>
               </motion.div>
             </div>
+
+            {/* Gigs Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 1.0 }}
+              className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-8"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                  <Briefcase className="h-6 w-6 text-blue-600" />
+                  Available Gigs
+                </h2>
+                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                  {gigs.length} {gigs.length === 1 ? 'Gig' : 'Gigs'}
+                </span>
+              </div>
+              
+              {gigsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-3 text-gray-600">Loading gigs...</span>
+                </div>
+              ) : gigs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {gigs.map((gig, index) => (
+                    <motion.div
+                      key={gig.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * index }}
+                      onClick={() => router.push(`/gigs/${gig.id}`)}
+                      className="border border-gray-200 rounded-xl p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-300 bg-white cursor-pointer transform hover:scale-[1.02]"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+                          {gig.title}
+                        </h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          gig.status === 'ACTIVE' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {gig.status}
+                        </span>
+                      </div>
+                      
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                        {gig.description}
+                      </p>
+                      
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {gig.tags && gig.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
+                          <span 
+                            key={tagIndex}
+                            className="px-2 py-1 bg-purple-100 text-purple-700 rounded-md text-xs font-medium"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {gig.tags && gig.tags.length > 3 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs">
+                            +{gig.tags.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <Star className="h-4 w-4 text-yellow-500" />
+                            {gig.reviewAvg || 0}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <User className="h-4 w-4" />
+                            {gig.reviewsCount || 0} reviews
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-gray-900">
+                            ${gig.profileId || 'N/A'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {gig.category}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Briefcase className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Gigs Available</h3>
+                  <p className="text-gray-600">
+                    {isOwnProfile 
+                      ? "You haven't posted any gigs yet." 
+                      : "This freelancer hasn't posted any gigs yet."
+                    }
+                  </p>
+                </div>
+              )}
+            </motion.div>
 
           </div>
         </div>

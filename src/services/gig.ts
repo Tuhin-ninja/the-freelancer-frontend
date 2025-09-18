@@ -115,6 +115,12 @@ export const profileAPI = {
     const response = await api.post('/api/profiles', profileData);
     return response.data;
   },
+
+  // Get gigs by user ID
+  getUserGigs: async (userId: number): Promise<Gig[]> => {
+    const response = await api.get(`/api/gigs/user/${userId}`);
+    return response.data;
+  },
 };
 
 export default { gigAPI, profileAPI };
