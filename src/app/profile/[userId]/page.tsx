@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { getProfile, updateProfilePicture } from '@/services/profile';
 import { gigAPI } from '@/services/gig';
+import stripeAPI from '@/services/stripe';
 import { updateUser } from '@/store/authSlice';
 import { useRouter } from 'next/navigation';
 
@@ -65,6 +66,16 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
   const [userId, setUserId] = useState<string | null>(null);
   const [gigs, setGigs] = useState<any[]>([]);
   const [gigsLoading, setGigsLoading] = useState(false);
+
+  // Stripe Connect states
+  const [isConnectingStripe, setIsConnectingStripe] = useState(false);
+  const [stripeError, setStripeError] = useState<string | null>(null);
+  const [stripeSuccess, setStripeSuccess] = useState<string | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<{
+    hasStripeAccount: boolean;
+    stripeAccountId: string | null;
+  } | null>(null);
+  const [stripeStatusLoading, setStripeStatusLoading] = useState(false);
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -109,6 +120,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
           
           if (data.user) {
             setUser(data.user);
+            console.log(user);
             setIsOwnProfile(loggedInUser?.id === data.user.id);
           } else if (loggedInUser && userId === String(loggedInUser.id)) {
             // If no user data returned but this is the logged-in user's profile
@@ -160,6 +172,80 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
     fetchUserGigs();
   }, [userId]);
 
+  // Handle Stripe onboarding callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeStatus = urlParams.get('stripe');
+
+    if (stripeStatus === 'success') {
+      // Show success message and refresh profile data
+      setStripeError(null);
+      setStripeSuccess('Stripe account connected successfully! You can now receive payments.');
+      console.log('Stripe onboarding completed successfully!');
+      // Remove the query parameter from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setStripeSuccess(null), 5000);
+      
+      // Refresh Stripe status to get updated information
+      // Add a small delay to ensure backend has processed Stripe webhooks
+      setTimeout(async () => {
+        try {
+          const statusData = await stripeAPI.getStripeStatus();
+          console.log('Refreshed Stripe status after onboarding:', statusData);
+          setStripeStatus({
+            hasStripeAccount: statusData.hasStripeAccount,
+            stripeAccountId: statusData.stripeAccountId
+          });
+        } catch (error) {
+          console.error('Error refreshing Stripe status:', error);
+        }
+      }, 2000); // 2 second delay to allow backend processing
+    } else if (stripeStatus === 'refresh') {
+      // User needs to complete onboarding again
+      setStripeError('Stripe onboarding was incomplete. Please try connecting again.');
+      // Remove the query parameter from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [userId]);
+
+  // Fetch Stripe status for own profile
+  useEffect(() => {
+    const fetchStripeStatus = async () => {
+      if (!isOwnProfile) return;
+
+      setStripeStatusLoading(true);
+      try {
+        const statusData = await stripeAPI.getStripeStatus();
+        console.log('Stripe status data:', statusData);
+        setStripeStatus({
+          hasStripeAccount: statusData.hasStripeAccount,
+          stripeAccountId: statusData.stripeAccountId
+        });
+      } catch (error) {
+        console.error('Error fetching Stripe status:', error);
+      } finally {
+        setStripeStatusLoading(false);
+      }
+    };
+
+    fetchStripeStatus();
+  }, [isOwnProfile]);
+
+  // Debug: Log stripe account status changes
+  useEffect(() => {
+    console.log('Stripe account status debug:', {
+      isOwnProfile,
+      stripeStatusLoading,
+      stripeStatus,
+      shouldShowWarning: isOwnProfile && 
+                        !stripeStatusLoading && 
+                        stripeStatus && 
+                        !stripeStatus.hasStripeAccount
+    });
+  }, [isOwnProfile, stripeStatusLoading, stripeStatus]);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -206,6 +292,51 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
+  };
+
+  const handleStripeConnect = async () => {
+    if (!user?.email) {
+      setStripeError('User email is required for Stripe account creation');
+      return;
+    }
+
+    setIsConnectingStripe(true);
+    setStripeError(null);
+
+    try {
+      // Step 1: Create Stripe account
+      const createAccountResponse = await stripeAPI.createAccount({
+        email: user.email,
+        country: user.country || 'US' // Default to US if country not available
+      });
+
+      console.log('Stripe account created:', createAccountResponse);
+
+      // Step 2: Create onboarding link
+      const currentUrl = window.location.origin;
+      const onboardingResponse = await stripeAPI.createOnboardingLink(
+        createAccountResponse.accountId,
+        {
+          refreshUrl: `${currentUrl}/profile/${userId}?stripe=refresh`,
+          returnUrl: `${currentUrl}/profile/${userId}?stripe=success`
+        }
+      );
+
+      console.log('Onboarding link created:', onboardingResponse);
+
+      // Redirect to Stripe onboarding
+      window.location.href = onboardingResponse.url;
+
+    } catch (error: any) {
+      console.error('Stripe Connect error:', error);
+      setStripeError(
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to connect Stripe account. Please try again.'
+      );
+    } finally {
+      setIsConnectingStripe(false);
+    }
   };
 
   if (loading) {
@@ -264,6 +395,29 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             </button>
           )}
         </motion.div>
+
+        {/* Success Notification */}
+        {stripeSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-6 p-4 bg-green-100 border border-green-300 rounded-xl shadow-lg"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-green-800 font-medium flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                {stripeSuccess}
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-green-700 hover:text-green-900 text-sm underline"
+              >
+                Refresh Page
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column */}
@@ -375,8 +529,26 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
               </div>
             </motion.div>
 
+            {/* Stripe Status Loading */}
+            {isOwnProfile && stripeStatusLoading && (
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="bg-blue-50 border border-blue-200 rounded-2xl shadow-xl p-6"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <p className="text-blue-700">Checking Stripe account status...</p>
+                </div>
+              </motion.div>
+            )}
+
             {/* Stripe Account Warning */}
-            {isOwnProfile && (!user?.stripeAccountId || user?.stripeAccountId === null) && (
+            {isOwnProfile && 
+             !stripeStatusLoading && 
+             stripeStatus && 
+             !stripeStatus.hasStripeAccount && (
               <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -396,17 +568,35 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                       To receive payments for your freelance work and gigs, you need to connect your Stripe account. 
                       This allows clients to pay you securely and helps you manage your earnings.
                     </p>
+                    
+                    {/* Error message */}
+                    {stripeError && (
+                      <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+                        <p className="text-red-700 text-sm flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          {stripeError}
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
-                        onClick={() => {
-                          // You can implement Stripe Connect flow here
-                          window.open('https://connect.stripe.com', '_blank');
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-all duration-300 shadow-lg font-semibold"
+                        onClick={handleStripeConnect}
+                        disabled={isConnectingStripe}
+                        className="flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700 disabled:bg-amber-400 disabled:cursor-not-allowed transition-all duration-300 shadow-lg font-semibold"
                       >
-                        <CreditCard className="h-4 w-4" />
-                        Connect Stripe Account
-                        <ExternalLink className="h-4 w-4" />
+                        {isConnectingStripe ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Connecting...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="h-4 w-4" />
+                            Connect Stripe Account
+                            <ExternalLink className="h-4 w-4" />
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={() => router.push('/profile/edit')}
@@ -438,6 +628,40 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                       Professional payment experience for clients
                     </li>
                   </ul>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Stripe Account Connected Success */}
+            {isOwnProfile && 
+             !stripeStatusLoading && 
+             stripeStatus && 
+             stripeStatus.hasStripeAccount && (
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl shadow-xl p-6"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0">
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-green-800 mb-2 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Stripe Account Connected
+                    </h3>
+                    <p className="text-green-700 leading-relaxed">
+                      Your Stripe account is connected and ready to receive payments! 
+                      Clients can now pay you securely for your freelance work and gigs.
+                    </p>
+                    {stripeStatus.stripeAccountId && (
+                      <p className="text-green-600 text-sm mt-2">
+                        Account ID: {stripeStatus.stripeAccountId}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}

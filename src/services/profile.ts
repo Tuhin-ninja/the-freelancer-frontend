@@ -19,7 +19,7 @@ export const updateProfilePicture = async (file: File): Promise<User> => {
 
 export const getProfile = async (userId: string): Promise<any> => {
   try {
-    const { data } = await api.get(`/api/profiles/${userId}`);
+    const { data } = await api.get(`/api/auth/public/users/${userId}`);
     console.log('Raw API response for profile:', data);
     return data;
   } catch (error: any) {
