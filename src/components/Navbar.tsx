@@ -150,12 +150,26 @@ const Navbar = () => {
                           </button>
                         </Link>
                         {user?.role === 'FREELANCER' && (
-                          <Link href="/my-proposals" className="w-full">
-                            <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                              <Briefcase className="mr-2 h-4 w-4" />
-                              My Proposals
-                            </button>
-                          </Link>
+                          <>
+                            <Link href="/my-proposals" className="w-full">
+                              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <Briefcase className="mr-2 h-4 w-4" />
+                                My Proposals
+                              </button>
+                            </Link>
+                            <Link href="/my-invitations" className="w-full">
+                              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <Bell className="mr-2 h-4 w-4" />
+                                My Invitations
+                              </button>
+                            </Link>
+                            <Link href="/my-contracts" className="w-full">
+                              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <FileText className="mr-2 h-4 w-4" />
+                                My Contracts
+                              </button>
+                            </Link>
+                          </>
                         )}
                         {user?.role === 'CLIENT' && (
                           <Link href="/contracts" className="w-full">

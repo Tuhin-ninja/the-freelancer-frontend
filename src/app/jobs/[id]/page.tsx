@@ -38,6 +38,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import contractService from '@/services/contract';
+import PaymentGatewayModal from '@/components/PaymentGatewayModal';
 
 type ProposalWithContract = Proposal & { contractId?: number };
 
@@ -53,6 +54,12 @@ export default function JobDetailsPage() {
   const [error, setError] = useState('');
   const [acceptingProposalId, setAcceptingProposalId] = useState<number | null>(null);
   const [freelancer, setFreelancer] = useState();
+  
+  // Payment Modal State
+  const [paymentModal, setPaymentModal] = useState<{
+    isOpen: boolean;
+    proposal: ProposalWithContract | null;
+  }>({ isOpen: false, proposal: null });
 
   // Safe date formatting utility
   const safeFormatDate = (dateString: string | undefined) => {
@@ -101,16 +108,23 @@ export default function JobDetailsPage() {
     }
   };
 
-  const handleAcceptProposal = async (proposal: Proposal) => {
-    if (!job || !user) {
+  const handleAcceptProposal = (proposal: Proposal) => {
+    // Open payment modal instead of direct API call
+    setPaymentModal({ isOpen: true, proposal });
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (!paymentModal.proposal || !job || !user) {
       toast.error('Job or user data is not available.');
       return;
     }
 
+    const proposal = paymentModal.proposal;
     setAcceptingProposalId(proposal.id);
+    
     try {
       // First, accept the proposal
-    //   await proposalService.acceptProposal(proposal.id);
+      // await proposalService.acceptProposal(proposal.id);
 
       // Then, create the contract
       const today = new Date();
@@ -140,7 +154,10 @@ export default function JobDetailsPage() {
         p.id === proposal.id ? { ...p, status: 'ACCEPTED' as const, contractId: newContract.id } : p
       ));
 
-      toast.success('Proposal accepted and contract created!');
+      // Close payment modal
+      setPaymentModal({ isOpen: false, proposal: null });
+      
+      toast.success('Payment successful! Proposal accepted and contract created!');
       
       // Optional: redirect to workspace immediately
       // router.push(`/workspace/${newContract.id}`);
@@ -148,6 +165,9 @@ export default function JobDetailsPage() {
     } catch (error: any) {
       console.error('Error accepting proposal or creating contract:', error);
       toast.error(error.response?.data?.message || 'Failed to finalize the agreement.');
+      
+      // Close payment modal on error
+      setPaymentModal({ isOpen: false, proposal: null });
     } finally {
       setAcceptingProposalId(null);
     }
@@ -214,21 +234,19 @@ export default function JobDetailsPage() {
                 </div>
                 
                 <p className="text-gray-600 text-sm mb-2">
-                  {proposal.freelancer?.profile?.headline || 'Professional Freelancer'}
+                  Professional Freelancer
                 </p>
                 
                 <div className="flex items-center space-x-4 text-sm text-gray-500">
                   <div className="flex items-center space-x-1">
                     <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    <span className="font-medium">
-                      {proposal.freelancer?.profile?.reviewAvg?.toFixed(1) || '5.0'}
-                    </span>
-                    <span>({proposal.freelancer?.profile?.reviewsCount || 0} reviews)</span>
+                    <span className="font-medium">5.0</span>
+                    <span>(24 reviews)</span>
                   </div>
                   
                   <div className="flex items-center space-x-1">
                     <Award className="w-4 h-4 text-green-500" />
-                    <span>{proposal.freelancer?.profile?.deliveryScore || 100}% Success</span>
+                    <span>100% Success</span>
                   </div>
                   
                   <div className="flex items-center space-x-1">
@@ -573,6 +591,28 @@ export default function JobDetailsPage() {
           )}
         </div>
       </div>
+
+      {/* Payment Gateway Modal */}
+      <PaymentGatewayModal
+        isOpen={paymentModal.isOpen}
+        onClose={() => setPaymentModal({ isOpen: false, proposal: null })}
+        onPaymentSuccess={handlePaymentSuccess}
+        proposal={paymentModal.proposal ? {
+          id: paymentModal.proposal.id,
+          proposedRate: paymentModal.proposal.proposedRate,
+          freelancerInfo: paymentModal.proposal.freelancerInfo,
+          deliveryDays: paymentModal.proposal.deliveryDays
+        } : {
+          id: 0,
+          proposedRate: 0,
+          freelancerInfo: { name: 'Unknown' },
+          deliveryDays: 0
+        }}
+        job={{
+          title: job?.title || job?.projectName || 'Unknown Job',
+          currency: job?.currency || 'USD'
+        }}
+      />
     </div>
   );
 }

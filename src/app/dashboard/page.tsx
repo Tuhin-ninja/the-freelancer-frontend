@@ -4,6 +4,7 @@ import { useAppSelector } from '@/hooks/redux';
 import { Briefcase, UserCircle, Plus, FileText, BarChart3, Settings, Star, Edit3, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import InviteFreelancerModal from '@/components/InviteFreelancerModal';
 
 const DashboardPage = () => {
   const router = useRouter();
@@ -17,6 +18,10 @@ const DashboardPage = () => {
   const [jobs, setJobs] = React.useState([]);
   const [jobsError, setJobsError] = React.useState('');
   const [gigsError, setGigsError] = React.useState('');
+  const [inviteModal, setInviteModal] = React.useState<{
+    isOpen: boolean;
+    selectedJobId: number | null;
+  }>({ isOpen: false, selectedJobId: null });
 
   React.useEffect(() => {
     if (!user) return;
@@ -30,6 +35,7 @@ const DashboardPage = () => {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         console.log("api is "+ `http://localhost:8080/api/gigs/my-gigs`);
+        console.log('user is', user);
         setGigs(res.data);
       } catch (err: any) {
         setGigsError(err.response?.data?.message || 'Failed to fetch gigs.');
@@ -77,13 +83,13 @@ const DashboardPage = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <div className="flex items-center justify-center mb-6">
+          {/* <div className="flex items-center justify-center mb-6">
             <img
               src="https://images.unsplash.com/photo-1755278338891-e8d8481ff087?q=80&w=3072&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
               alt="Profile"
               className="object-cover h-20 w-20 rounded-full border-4 border-white shadow-lg"
             />
-          </div>
+          </div> */}
           <motion.h1
             initial={{ scale: 0.9, opacity: 0.8 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -93,7 +99,7 @@ const DashboardPage = () => {
             Welcome back, {user?.name || 'User'}!
           </motion.h1>
           <p className="text-gray-600 text-lg">
-            {user?.role === 'FREELANCER' ? 'Ready to showcase your skills?' : 'Ready to find the perfect FREELANCER?'}
+            {user?.role === 'FREELANCER' ? 'Ready to showcase your skills?' : 'Ready to find the perfect freelancer?'}
           </p>
         </motion.div>
 
@@ -419,7 +425,7 @@ const DashboardPage = () => {
                       </span>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -436,6 +442,17 @@ const DashboardPage = () => {
                       >
                         Edit
                       </motion.button>
+                      {job.status === 'OPEN' && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setInviteModal({ isOpen: true, selectedJobId: job.id })}
+                          className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-700 transition-all duration-200 flex items-center gap-2"
+                        >
+                          <UserCircle className="h-4 w-4" />
+                          Invite Freelancers
+                        </motion.button>
+                      )}
                     </div>
                   </div>
 
@@ -500,6 +517,23 @@ const DashboardPage = () => {
         )}
 
       </div>
+
+      {/* Invite Freelancer Modal */}
+      {inviteModal.isOpen && inviteModal.selectedJobId && (
+        <InviteFreelancerModal
+          isOpen={inviteModal.isOpen}
+          onClose={() => setInviteModal({ isOpen: false, selectedJobId: null })}
+          jobId={inviteModal.selectedJobId}
+          jobTitle={(() => {
+            const job: any = jobs.find((job: any) => job.id === inviteModal.selectedJobId);
+            return job?.title || job?.projectName || 'Unknown Job';
+          })()}
+          onInviteSent={() => {
+            console.log('Invitation sent successfully!');
+            // Optionally show a success notification
+          }}
+        />
+      )}
     </div>
   );
 };

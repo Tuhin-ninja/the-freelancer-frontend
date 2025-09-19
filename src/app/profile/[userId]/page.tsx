@@ -26,13 +26,15 @@ import {
   AlertTriangle,
   CreditCard,
   ExternalLink,
-  FileText
+  FileText,
+  Send
 } from 'lucide-react';
 import { getProfile, updateProfilePicture } from '@/services/profile';
 import { gigAPI } from '@/services/gig';
 import stripeAPI from '@/services/stripe';
 import ReviewService, { Review } from '@/services/review';
 import userService from '@/services/user';
+import InviteModal from '@/components/InviteModal';
 import { updateUser } from '@/store/authSlice';
 import { useRouter } from 'next/navigation';
 
@@ -95,6 +97,16 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Invite modal states
+  const [inviteModal, setInviteModal] = useState<{
+    isOpen: boolean;
+    selectedJobId: number | null;
+  }>({
+    isOpen: false,
+    selectedJobId: null
+  });
+  const [clientJobs, setClientJobs] = useState<{id: number, title: string}[]>([]);
 
   useEffect(() => {
     const initializeParams = async () => {
@@ -258,6 +270,39 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
     fetchFREELANCERReviews();
   }, [userId, user]);
+
+  // Fetch client jobs for invitation
+  useEffect(() => {
+    const fetchClientJobs = async () => {
+      if (!loggedInUser || loggedInUser.role !== 'CLIENT') return;
+
+      try {
+        // Mock data for now - replace with actual API call
+        const mockJobs = [
+          { id: 3, title: 'Build a Modern E-commerce Website' },
+          { id: 4, title: 'Mobile App Development for Food Delivery' },
+          { id: 5, title: 'UI/UX Design for SaaS Platform' }
+        ];
+        setClientJobs(mockJobs);
+      } catch (error) {
+        console.error('Error fetching client jobs:', error);
+      }
+    };
+
+    fetchClientJobs();
+  }, [loggedInUser]);
+
+  const handleInviteClick = () => {
+    if (clientJobs.length === 0) {
+      alert('You need to post a job first before sending invitations.');
+      return;
+    }
+    
+    setInviteModal({
+      isOpen: true,
+      selectedJobId: clientJobs[0].id // Default to first job
+    });
+  };
 
   // Handle Stripe onboarding callback
   useEffect(() => {
@@ -554,6 +599,19 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                 <MapPin className="h-4 w-4 mr-1.5" />
                 <span>{profileData?.locationText || 'Location not set'}</span>
               </div>
+              
+              {/* Invite Button for Client Users */}
+              {!isOwnProfile && loggedInUser?.role === 'CLIENT' && user?.role === 'FREELANCER' && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setInviteModal({ isOpen: true, selectedJobId: null })}
+                  className="mt-4 flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-lg mx-auto"
+                >
+                  <Mail className="h-5 w-5" />
+                  Invite to Job
+                </motion.button>
+              )}
             </motion.div>
 
             {/* Social Links */}
@@ -1121,6 +1179,23 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
           </div>
         </div>
+
+        {/* Invite Modal */}
+        {inviteModal.isOpen && userId && user && inviteModal.selectedJobId && (
+          <InviteModal
+            isOpen={inviteModal.isOpen}
+            onClose={() => setInviteModal({ isOpen: false, selectedJobId: null })}
+            jobId={inviteModal.selectedJobId}
+            jobTitle={clientJobs.find(job => job.id === inviteModal.selectedJobId)?.title || 'Unknown Job'}
+            freelancerId={parseInt(userId)}
+            freelancerName={user.name}
+            freelancerHandle={user.handle}
+            onInviteSent={() => {
+              console.log('Invitation sent successfully!');
+              // Optionally show a success notification
+            }}
+          />
+        )}
 
       </div>
     </div>
