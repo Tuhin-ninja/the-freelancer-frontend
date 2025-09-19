@@ -7,6 +7,7 @@ import { store } from '@/store';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AuthInitializer from '@/components/AuthInitializer';
+import ChatbotButtonWithWidget from '@/components/ChatbotButtonWithWidget';
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -51,6 +52,9 @@ export function ClientProviders({ children }: ClientProvidersProps) {
         {children}
       </main>
       {!hideFooter && <Footer />}
+      
+      {/* Global Chatbot - Available on all pages */}
+      <ChatbotButtonWithWidget />
     </Provider>
   );
 }
