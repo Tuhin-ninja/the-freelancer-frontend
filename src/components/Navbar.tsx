@@ -18,6 +18,7 @@ import {
   PlusCircle,
   FileText
 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const [showDropdown, setShowDropdown] = React.useState(false);
@@ -114,6 +115,8 @@ const Navbar = () => {
           <div className="flex items-center space-x-4 flex-shrink-0">
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
+                {/* Notifications Bell */}
+                <NotificationBell />
                 <div className="relative">
                   <button
                     className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 border-2 border-blue-400 focus:outline-none overflow-hidden"
@@ -121,7 +124,7 @@ const Navbar = () => {
                     onClick={() => setShowDropdown((prev) => !prev)}
                   >
                     <img
-                      src={userProfile?.profilePictureUrl || user?.profilePictureUrl || user?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`}
+                      src={userProfile?.profilePictureUrl || user?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`}
                       alt="Profile"
                       className="object-cover w-12 h-12 rounded-full"
                     />
@@ -131,7 +134,7 @@ const Navbar = () => {
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 transition-all duration-200 z-50">
                       <div className="py-4 px-4 flex flex-col items-center">
                         <img
-                          src={userProfile?.profilePictureUrl || user?.profilePictureUrl || user?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`}
+                          src={userProfile?.profilePictureUrl || user?.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`}
                           alt="Profile"
                           className="object-cover h-12 w-12 rounded-full mb-2"
                         />
@@ -171,7 +174,7 @@ const Navbar = () => {
                             </Link>
                           </>
                         )}
-                        {user?.role === 'CLIENT' && (
+                        {user?.role === 'client' && (
                           <Link href="/contracts" className="w-full">
                             <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
                               <FileText className="mr-2 h-4 w-4" />
