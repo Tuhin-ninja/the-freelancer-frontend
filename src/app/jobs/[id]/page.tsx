@@ -32,7 +32,9 @@ import {
   MessageCircle,
   ExternalLink,
   Zap,
-  Shield
+  Shield,
+  Wand2,
+  Loader2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -60,6 +62,10 @@ export default function JobDetailsPage() {
     isOpen: boolean;
     proposal: ProposalWithContract | null;
   }>({ isOpen: false, proposal: null });
+
+  // AI Analysis State
+  const [analyzingProposalId, setAnalyzingProposalId] = useState<number | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<{[key: number]: any}>({});
 
   // Safe date formatting utility
   const safeFormatDate = (dateString: string | undefined) => {
@@ -170,6 +176,52 @@ export default function JobDetailsPage() {
       setPaymentModal({ isOpen: false, proposal: null });
     } finally {
       setAcceptingProposalId(null);
+    }
+  };
+
+  const analyzeProposal = async (proposal: ProposalWithContract) => {
+    if (!job) {
+      toast.error('Job details not available for analysis');
+      return;
+    }
+
+    setAnalyzingProposalId(proposal.id);
+
+    try {
+      const response = await fetch('/api/ai/analyze-proposal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proposalContent: proposal.coverLetter,
+          freelancerExperience: proposal.freelancerInfo?.name || 'Anonymous Freelancer',
+          proposedRate: proposal.proposedRate,
+          deliveryDays: proposal.deliveryDays
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze proposal');
+      }
+
+      const data = await response.json();
+      console.log('AI analysis response:', data);
+      
+      if (data) {
+        setAnalysisResults(prev => ({
+          ...prev,
+          [proposal.id]: data
+        }));
+        toast.success('Proposal analysis completed!');
+      } else {
+        throw new Error('No analysis data received from AI');
+      }
+    } catch (error) {
+      console.error('Error analyzing proposal:', error);
+      toast.error('Failed to analyze proposal. Please try again.');
+    } finally {
+      setAnalyzingProposalId(null);
     }
   };
 
@@ -381,30 +433,123 @@ export default function JobDetailsPage() {
           </div>
         </div>
 
+        {/* AI Analysis Section */}
+        {analysisResults[proposal.id] && (
+          <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 border-t border-gray-100">
+            <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+              <Wand2 className="w-5 h-5 mr-2 text-purple-600" />
+              AI Analysis Results
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">Overall Score</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    {analysisResults[proposal.id].overallScore || 'N/A'}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">Strengths</span>
+                  <span className="text-sm text-green-600 font-medium">
+                    {analysisResults[proposal.id].strengths?.length || 0} found
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {analysisResults[proposal.id].strengths && (
+              <div className="mt-4">
+                <h5 className="font-medium text-gray-800 mb-2">Key Strengths:</h5>
+                <div className="flex flex-wrap gap-2">
+                  {analysisResults[proposal.id].strengths.map((strength: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                    >
+                      {strength}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {analysisResults[proposal.id].weaknesses && analysisResults[proposal.id].weaknesses.length > 0 && (
+              <div className="mt-4">
+                <h5 className="font-medium text-gray-800 mb-2">Areas for Consideration:</h5>
+                <div className="flex flex-wrap gap-2">
+                  {analysisResults[proposal.id].weaknesses.map((weakness: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm"
+                    >
+                      {weakness}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {analysisResults[proposal.id].recommendations && analysisResults[proposal.id].recommendations.length > 0 && (
+              <div className="mt-4">
+                <h5 className="font-medium text-gray-800 mb-2">Recommendations:</h5>
+                <ul className="space-y-1">
+                  {analysisResults[proposal.id].recommendations.map((rec: string, index: number) => (
+                    <li key={index} className="text-sm text-gray-700 flex items-start">
+                      <span className="text-purple-600 mr-2">•</span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="p-6 bg-gray-50 border-t border-gray-100">
           {proposal.status === 'SUBMITTED' ? (
-            <div className="flex space-x-4">
-              <Button
-                onClick={() => handleAcceptProposal(proposal)}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                disabled={acceptingProposalId === proposal.id}
-              >
-                {acceptingProposalId === proposal.id ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Accepting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Accept & Hire
-                  </>
-                )}
-              </Button>
+            <div className="space-y-3">
+              <div className="flex space-x-3">
+                <Button
+                  onClick={() => analyzeProposal(proposal)}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                  disabled={analyzingProposalId === proposal.id}
+                >
+                  {analyzingProposalId === proposal.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Analyze with AI
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => handleAcceptProposal(proposal)}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+                  disabled={acceptingProposalId === proposal.id}
+                >
+                  {acceptingProposalId === proposal.id ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Accepting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Accept & Hire
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           ) : proposal.status === 'PENDING' ? (
             <div className="flex items-center justify-center py-3">

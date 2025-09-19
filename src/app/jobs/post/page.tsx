@@ -772,7 +772,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import jobService from '@/services/job';
-import { CheckCircle, AlertCircle, ChevronRight, DollarSign, Clock, Calendar, Paperclip, Eye, Plus, X, PlayCircle, PauseCircle, StopCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertCircle, ChevronRight, DollarSign, Clock, Calendar, Paperclip, Eye, Plus, X, PlayCircle, PauseCircle, StopCircle, RefreshCw, Wand2, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function PostJobPage() {
@@ -801,6 +801,9 @@ export default function PostJobPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [enhancingDescription, setEnhancingDescription] = useState(false);
+  const [suggestingSkills, setSuggestingSkills] = useState(false);
+  const [aiSuggestedSkills, setAiSuggestedSkills] = useState<string[]>([]);
 
   // Suggested skills based on common categories
   const suggestedSkills = [
@@ -935,6 +938,89 @@ export default function PostJobPage() {
       return false;
     }
     return true;
+  };
+
+  const enhanceJobDescription = async () => {
+    if (!formData.description.trim()) {
+      setError('Please enter a basic description first to enhance it with AI');
+      return;
+    }
+
+    setEnhancingDescription(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/ai/enhance-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: formData.description
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to enhance description');
+      }
+
+      const data = await response.json();
+      console.log('AI enhancement response:', data);
+      
+      if (data.enhancedDescription) {
+        setFormData({ ...formData, description: data.enhancedDescription });
+        setError(''); // Clear any existing errors
+        // You could add a success toast here if you have a toast system
+      } else {
+        throw new Error('No enhanced description received from AI');
+      }
+    } catch (error) {
+      console.error('Error enhancing description:', error);
+      setError('Failed to enhance description. Please try again.');
+    } finally {
+      setEnhancingDescription(false);
+    }
+  };
+
+  const suggestSkillsWithAI = async () => {
+    if (!formData.description.trim()) {
+      setError('Please enter a job description first to get AI skill suggestions');
+      return;
+    }
+
+    setSuggestingSkills(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/ai/suggest-skills', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: formData.description
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to suggest skills');
+      }
+
+      const data = await response.json();
+      console.log('AI skills suggestion response:', data);
+      
+      if (data.suggestedSkills && Array.isArray(data.suggestedSkills)) {
+        setAiSuggestedSkills(data.suggestedSkills);
+        setError(''); // Clear any existing errors
+      } else {
+        throw new Error('No skills suggestions received from AI');
+      }
+    } catch (error) {
+      console.error('Error suggesting skills:', error);
+      setError('Failed to suggest skills. Please try again.');
+    } finally {
+      setSuggestingSkills(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1346,9 +1432,31 @@ export default function PostJobPage() {
 
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Job Description*
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                  Job Description*
+                </label>
+                
+                <Button
+                  type="button"
+                  onClick={enhanceJobDescription}
+                  disabled={enhancingDescription || !formData.description.trim()}
+                  className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {enhancingDescription ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Enhancing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4" />
+                      <span>Enhance with AI</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+              
               <Textarea
                 id="description"
                 name="description"
@@ -1359,15 +1467,36 @@ export default function PostJobPage() {
                 className="w-full min-h-[200px] rounded-xl border border-transparent bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 text-gray-900 shadow-sm focus:outline-none focus:ring-4 focus:ring-purple-200 hover:from-purple-100 hover:via-pink-100 hover:to-red-100 transition-all duration-300 ease-in-out p-3"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Be detailed about project scope, timeline, and specific requirements.
+                Be detailed about project scope, timeline, and specific requirements. Use "Enhance with AI" to improve your description.
               </p>
             </div>
 
 
             <div>
-              <label htmlFor="skills" className="block text-2xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 bg-clip-text text-transparent mb-3">
-                What skills are required?
-              </label>
+              <div className="flex items-center justify-between mb-3">
+                <label htmlFor="skills" className="block text-2xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 bg-clip-text text-transparent">
+                  What skills are required?
+                </label>
+                
+                <Button
+                  type="button"
+                  onClick={suggestSkillsWithAI}
+                  disabled={suggestingSkills || !formData.description.trim()}
+                  className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {suggestingSkills ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Suggesting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4" />
+                      <span>AI Suggest Skills</span>
+                    </>
+                  )}
+                </Button>
+              </div>
               <p className="text-gray-600 text-base mb-5">
                 We’ve detected the following skills to suit your project. Modify or add up to 10 skills to best match your needs.
               </p>
@@ -1415,8 +1544,32 @@ export default function PostJobPage() {
                 </p>
               </div>
 
-              {/* Suggested Skills */}
-              <div className="mt-5">
+              {/* AI Suggested Skills */}
+              {aiSuggestedSkills.length > 0 && (
+                <div className="mt-5">
+                  <p className="text-base text-gray-700 mb-2">
+                    <strong className="font-semibold text-gray-800">✨ AI Suggested skills:</strong>{' '}
+                    <span className="space-x-2">
+                      {aiSuggestedSkills
+                        .filter(skill => !formData.skills.includes(skill))
+                        .map((skill, index) => (
+                          <button
+                            key={skill}
+                            type="button"
+                            onClick={() => handleAddSkillFromSuggestion(skill)}
+                            className="inline-block bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-full text-xs font-medium hover:from-blue-600 hover:to-purple-600 transition-all duration-200 disabled:opacity-40"
+                            disabled={formData.skills.length >= 10}
+                          >
+                            {skill}
+                          </button>
+                        ))}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {/* Default Suggested Skills */}
+              {/* <div className="mt-5">
                 <p className="text-base text-gray-700 mb-2">
                   <strong className="font-semibold text-gray-800">Suggested skills:</strong>{' '}
                   <span className="space-x-2">
@@ -1435,7 +1588,7 @@ export default function PostJobPage() {
                       ))}
                   </span>
                 </p>
-              </div>
+              </div> */}
             </div>
 
 
