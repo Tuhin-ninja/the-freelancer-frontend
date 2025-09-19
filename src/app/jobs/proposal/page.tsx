@@ -21,7 +21,9 @@ import {
   AlertCircle,
   Sparkles,
   Zap,
-  Award
+  Award,
+  Wand2,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +45,7 @@ export default function ProposalPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [portfolioLinks, setPortfolioLinks] = useState<string[]>(['']);
+  const [generatingCoverLetter, setGeneratingCoverLetter] = useState(false);
   
   const [formData, setFormData] = useState<Omit<ProposalData, 'jobId'>>({
     coverLetter: '',
@@ -106,6 +109,49 @@ export default function ProposalPage() {
     if (portfolioLinks.length > 1) {
       const newLinks = portfolioLinks.filter((_, i) => i !== index);
       setPortfolioLinks(newLinks);
+    }
+  };
+
+  const generateAICoverLetter = async () => {
+    if (!job) {
+      toast.error('Job details not available');
+      return;
+    }
+
+    setGeneratingCoverLetter(true);
+
+    try {
+      const response = await fetch('/api/ai/generate-cover-letter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobTitle: job.title || job.projectName || 'Job Title',
+          jobDescription: job.description || 'Job description',
+          freelancerExperience: "7+ years React development, built 3 healthcare platforms, HIPAA compliance experience, worked with major hospitals and clinics",
+          keySkills: "React, TypeScript, Redux, HIPAA compliance, Healthcare APIs, Node.js, PostgreSQL, AWS"
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate cover letter');
+      }
+
+      const data = await response.json();
+      console.log('ai response:', data);
+      
+      if (data.coverLetter) {
+        setFormData({ ...formData, coverLetter: data.coverLetter });
+        toast.success('AI cover letter generated successfully!');
+      } else {
+        throw new Error('No cover letter received from AI');
+      }
+    } catch (error) {
+      console.error('Error generating cover letter:', error);
+      toast.error('Failed to generate cover letter. Please try again.');
+    } finally {
+      setGeneratingCoverLetter(false);
     }
   };
 
@@ -286,11 +332,32 @@ export default function ProposalPage() {
           >
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg text-white">
-                    <FileText className="h-5 w-5" />
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg text-white">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Cover Letter</h3>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">Cover Letter</h3>
+                  
+                  <Button
+                    type="button"
+                    onClick={generateAICoverLetter}
+                    disabled={generatingCoverLetter}
+                    className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {generatingCoverLetter ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4" />
+                        <span>Generate with AI</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
                 
                 <Textarea
