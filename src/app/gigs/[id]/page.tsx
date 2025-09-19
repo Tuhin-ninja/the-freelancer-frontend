@@ -25,8 +25,6 @@ import { useAppSelector } from '@/store/hooks';
 import { gigAPI } from '@/services/gig';
 import { Gig } from '@/types/api';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
 
 interface GigMedia {
@@ -176,11 +174,6 @@ export default function GigDetailsPage() {
   const [packages, setPackages] = useState<GigPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<GigPackage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [proposalForm, setProposalForm] = useState({
-    message: '',
-    timeline: ''
-  });
-  const [showProposalForm, setShowProposalForm] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [media, setMedia] = useState<GigMedia[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -218,7 +211,7 @@ export default function GigDetailsPage() {
     setSelectedPackage(pkg);
   };
 
-  const handleSendProposal = () => {
+  const handleSendProposal = async () => {
     if (!selectedPackage) return;
     
     if (!isAuthenticated) {
@@ -227,24 +220,59 @@ export default function GigDetailsPage() {
       return;
     }
     
-    setShowProposalForm(true);
+    const freelancerInfo = gig?.freelancerInfo;
+    if (!freelancerInfo) {
+      toast.error("Freelancer information not available.");
+      return;
+    }
+
+    try {
+      // Create initial proposal message
+      const proposalMessage = `Hi ${freelancerInfo.name}! 
+
+I'm interested in your gig "${gig.title}" and would like to discuss the ${selectedPackage.title} package ($${(selectedPackage.priceCents / 100).toLocaleString()}).
+
+Package details:
+- ${selectedPackage.description}
+- Delivery: ${selectedPackage.deliveryDays} days
+- Revisions: ${selectedPackage.revisions || 'Unlimited'}
+
+I'd love to discuss this project with you. Please let me know if you have any questions!`;
+
+      // Get access token from localStorage
+      const accessToken = localStorage.getItem('accessToken');
+      
+      // Call the direct-messages API to create the initial message
+      const response = await fetch('/api/direct-messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+        },
+        body: JSON.stringify({
+          receiverId: freelancerInfo.id,
+          content: proposalMessage,
+          messageType: 'TEXT'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      // Show success message
+      toast.success(`Proposal sent to ${freelancerInfo.name}!`);
+      
+      // Redirect to messages page
+      router.push('/messages');
+      
+    } catch (error) {
+      console.error('Error sending proposal:', error);
+      toast.error('Failed to send proposal. Please try again.');
+    }
   };
 
-  const handleSubmitProposal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement proposal submission
-    console.log('Submitting proposal:', {
-      gigId,
-      packageId: selectedPackage?.id,
-      message: proposalForm.message,
-      timeline: proposalForm.timeline
-    });
-    
-    // Show success message and redirect
-    toast.success('Proposal sent successfully!');
-    setShowProposalForm(false);
-    router.push('/dashboard');
-  };
+
 
   if (loading) {
     return (
@@ -395,114 +423,65 @@ export default function GigDetailsPage() {
           </div>
         </motion.div>
 
-        {/* Action Section */}
-        <AnimatePresence>
-          {selectedPackage && (
-            <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 50, scale: 0.9 }}
-              transition={{ duration: 0.5 }}
-              className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20"
-            >
-              <div className="text-center mb-8">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-400 to-blue-500 text-white rounded-full font-bold text-lg mb-4"
-                >
-                  <Award className="mr-2 h-5 w-5" />
-                  {selectedPackage.tier} Package Selected
-                </motion.div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedPackage.title}</h3>
-                <p className="text-3xl font-bold text-gray-900">
-                  ${(selectedPackage.priceCents / 100).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="flex justify-center">
-                <Button
-                  onClick={handleSendProposal}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-12 py-4 rounded-xl text-lg font-bold transition-all duration-300 hover:shadow-2xl hover:scale-105"
-                >
-                  Send Proposal
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Proposal Form Modal */}
-        <AnimatePresence>
-          {showProposalForm && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        {/* Action Section - Only visible for CLIENT role */}
+        {user?.role?.toLowerCase() === 'client' && (
+          <AnimatePresence>
+            {selectedPackage && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.8, y: 50 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: 50 }}
-                transition={{ duration: 0.3 }}
-                className="bg-white rounded-3xl shadow-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto"
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 50, scale: 0.9 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20"
               >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900">Send Proposal</h3>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowProposalForm(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                <div className="text-center mb-8">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-400 to-blue-500 text-white rounded-full font-bold text-lg mb-4"
                   >
-                    ×
-                  </Button>
+                    <Award className="mr-2 h-5 w-5" />
+                    {selectedPackage.tier} Package Selected
+                  </motion.div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedPackage.title}</h3>
+                  <p className="text-3xl font-bold text-gray-900">
+                    ${(selectedPackage.priceCents / 100).toLocaleString()}
+                  </p>
                 </div>
 
-                <form onSubmit={handleSubmitProposal} className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Your Message
-                    </label>
-                    <Textarea
-                      value={proposalForm.message}
-                      onChange={(e) => setProposalForm(prev => ({ ...prev, message: e.target.value }))}
-                      placeholder="Tell the freelancer about your project requirements..."
-                      rows={5}
-                      className="w-full rounded-xl border-gray-300 focus:border-purple-500 focus:ring-purple-500"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Timeline (optional)
-                    </label>
-                    <Input
-                      value={proposalForm.timeline}
-                      onChange={(e) => setProposalForm(prev => ({ ...prev, timeline: e.target.value }))}
-                      placeholder="When do you need this completed?"
-                      className="w-full rounded-xl border-gray-300 focus:border-purple-500 focus:ring-purple-500"
-                    />
-                  </div>
-
-                  <div className="flex space-x-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowProposalForm(false)}
-                      className="flex-1 rounded-xl"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl"
-                    >
-                      Send Proposal
-                    </Button>
-                  </div>
-                </form>
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleSendProposal}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-12 py-4 rounded-xl text-lg font-bold transition-all duration-300 hover:shadow-2xl hover:scale-105"
+                  >
+                    Send Proposal
+                  </Button>
+                </div>
               </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
+        {/* Info message for freelancers */}
+        {user?.role?.toLowerCase() === 'freelancer' && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="bg-blue-50 rounded-3xl p-6 text-center border border-blue-200"
+          >
+            <div className="flex items-center justify-center mb-3">
+              <User className="h-6 w-6 text-blue-600 mr-2" />
+              <h3 className="text-lg font-semibold text-blue-800">Freelancer View</h3>
             </div>
-          )}
-        </AnimatePresence>
+            <p className="text-blue-600">
+              You are viewing this gig as a freelancer. Only clients can send proposals to hire freelancers.
+            </p>
+          </motion.div>
+        )}
+
+
       </div>
     </div>
   );

@@ -271,6 +271,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   profilePicture?: string; // Optional profile picture property
+  profilePictureUrl?: string; // Profile picture URL from API
   stripeAccountId?: string | null; // Stripe account ID for payments
 }
 
@@ -468,6 +469,7 @@ export interface Message {
   createdAt: string;
   updatedAt: string;
   sender?: User;
+  isDeleted?: boolean; // Optional flag to track deleted messages
 }
 
 export interface Conversation {

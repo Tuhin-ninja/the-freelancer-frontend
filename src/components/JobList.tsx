@@ -561,10 +561,10 @@ const JobCard = ({ job, onClick }: JobCardProps) => {
               <div className="flex items-center text-sm text-gray-500">
                 <span>Posted {formatDate(job.createdAt || job.created_at)}</span>
                 <span className="mx-2">•</span>
-                <span className="flex items-center">
+                {/* <span className="flex items-center">
                   <Eye className="h-3 w-3 mr-1" />
                   {Math.floor(Math.random() * 100) + 10} views
-                </span>
+                </span> */}
               </div>
             </div>
           </div>
@@ -652,14 +652,14 @@ const JobCard = ({ job, onClick }: JobCardProps) => {
               <span>Due: {new Date(job.deadline).toLocaleDateString()}</span>
             </div>
           )}
-          <div className="flex items-center text-gray-600">
+          {/* <div className="flex items-center text-gray-600">
             <MessageSquare className="h-4 w-4 mr-2" />
             <span>{Math.floor(Math.random() * 15)} proposals</span>
-          </div>
-          <div className="flex items-center text-gray-600">
+          </div> */}
+          {/* <div className="flex items-center text-gray-600">
             <Star className="h-4 w-4 mr-2 text-yellow-400 fill-current" />
             <span>4.8 (12 reviews)</span>
-          </div>
+          </div> */}
         </div>
 
         {/* Additional Requirements */}
@@ -724,37 +724,7 @@ const JobCard = ({ job, onClick }: JobCardProps) => {
       {/* Actions Footer */}
       <div className="border-t border-gray-100 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsLiked(!isLiked)}
-              className={`flex items-center space-x-2 ${isLiked ? 'text-red-500' : 'text-gray-500'}`}
-            >
-              <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
-              <span className="text-sm">{isLiked ? 'Liked' : 'Like'}</span>
-            </Button>
-            
-            <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-500">
-              <MessageSquare className="h-4 w-4" />
-              <span className="text-sm">Comment</span>
-            </Button>
-            
-            <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-gray-500">
-              <Share2 className="h-4 w-4" />
-              <span className="text-sm">Share</span>
-            </Button>
-          </div>
-          
           <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSaved(!isSaved)}
-              className={`${isSaved ? 'text-blue-500' : 'text-gray-500'}`}
-            >
-              <Bookmark className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
-            </Button>
             
             {/* Only show Apply button for authenticated freelancers */}
             {isFreelancer ? (

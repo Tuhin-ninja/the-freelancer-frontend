@@ -1,6 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { Conversation, User } from '@/types/api';
 import { motion } from 'framer-motion';
+import userService from '@/services/user';
+
+// Avatar component with profile picture and fallback
+const UserAvatar: React.FC<{
+  user: User | null;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}> = ({ user, size = 'md', className = '' }) => {
+  const [imageError, setImageError] = useState(false);
+
+  const sizeClasses = {
+    sm: 'w-8 h-8 text-sm',
+    md: 'w-12 h-12 text-base',
+    lg: 'w-16 h-16 text-xl'
+  };
+
+  const profilePictureUrl = user?.profilePictureUrl || user?.profilePicture;
+
+  if (profilePictureUrl && !imageError) {
+    return (
+      <img
+        src={profilePictureUrl}
+        alt={user?.name || 'User'}
+        className={`${sizeClasses[size]} rounded-full object-cover border-2 border-white shadow-sm ${className}`}
+        onError={() => setImageError(true)}
+      />
+    );
+  }
+
+  // Fallback to initial
+  return (
+    <div className={`${sizeClasses[size]} bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold ${className}`}>
+      {user?.name?.charAt(0).toUpperCase() || 'U'}
+    </div>
+  );
+};
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -52,6 +88,64 @@ const ConversationList: React.FC<ConversationListProps> = ({
   currentUser
 }) => {
   const formatMessageTime = useFormatMessageTime();
+  const [userProfiles, setUserProfiles] = useState<{ [userId: string]: User }>({});
+  const [loadingProfiles, setLoadingProfiles] = useState<Set<string>>(new Set());
+
+  // Load user profiles for conversation participants
+  const loadUserProfile = async (userId: string | number) => {
+    const userIdStr = String(userId);
+    
+    // Skip if already loaded or loading
+    if (userProfiles[userIdStr] || loadingProfiles.has(userIdStr)) {
+      return;
+    }
+
+    try {
+      setLoadingProfiles(prev => new Set(prev).add(userIdStr));
+      
+      // Clean the user ID similar to ChatWindow
+      let cleanUserId;
+      if (Array.isArray(userId)) {
+        cleanUserId = userId[0]?.toString() || '';
+      } else if (typeof userId === 'object') {
+        cleanUserId = Object.values(userId)[0]?.toString() || '';
+      } else {
+        cleanUserId = String(userId);
+      }
+      cleanUserId = cleanUserId.replace(/[^\d]/g, '');
+      
+      console.log(`🔄 Loading profile for user ${cleanUserId} in conversation list`);
+      
+      const profileData = await userService.getUserById(Number(cleanUserId));
+      setUserProfiles(prev => ({
+        ...prev,
+        [userIdStr]: profileData
+      }));
+      
+      console.log('✅ Loaded profile data for conversation list:', profileData);
+    } catch (error) {
+      console.error('❌ Failed to load user profile for conversation list:', error);
+    } finally {
+      setLoadingProfiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userIdStr);
+        return newSet;
+      });
+    }
+  };
+
+  // Load profiles for all conversation participants
+  useEffect(() => {
+    if (!currentUser || !conversations.length) return;
+
+    conversations.forEach(conversation => {
+      const otherParticipant = getOtherParticipant(conversation);
+      if (otherParticipant?.id) {
+        loadUserProfile(otherParticipant.id);
+      }
+    });
+  }, [conversations, currentUser]);
+
   const getOtherParticipant = (conversation: Conversation): User | null => {
     if (!currentUser) return null;
     
@@ -97,6 +191,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     <div>
       {conversations.map((conversation) => {
         const otherParticipant = getOtherParticipant(conversation);
+        const otherParticipantProfile = otherParticipant ? userProfiles[String(otherParticipant.id)] : null;
         const isSelected = selectedConversation?.id === conversation.id;
         const hasUnread = conversation.unreadCount && conversation.unreadCount > 0;
 
@@ -116,9 +211,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
             <div className="flex items-center p-4">
               {/* Avatar */}
               <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                  {otherParticipant?.name?.charAt(0).toUpperCase() || 'U'}
-                </div>
+                <UserAvatar 
+                  user={otherParticipantProfile || otherParticipant || null} 
+                  size="md"
+                />
                 {/* Online indicator (you can implement this based on your backend) */}
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
               </div>
@@ -129,7 +225,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   <h3 className={`text-sm font-medium truncate ${
                     hasUnread ? 'text-gray-900 font-semibold' : 'text-gray-700'
                   }`}>
-                    {otherParticipant?.name || 'Unknown User'}
+                    {(otherParticipantProfile || otherParticipant)?.name || 'Unknown User'}
                   </h3>
                   
                   {conversation.lastMessage && (
@@ -157,13 +253,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 {/* User role badge */}
                 <div className="mt-1">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    otherParticipant?.role === 'freelancer'
+                    (otherParticipantProfile || otherParticipant)?.role === 'freelancer'
                       ? 'bg-green-100 text-green-800'
-                      : otherParticipant?.role === 'client'
+                      : (otherParticipantProfile || otherParticipant)?.role === 'client'
                       ? 'bg-blue-100 text-blue-800'
                       : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {otherParticipant?.role || 'User'}
+                    {(otherParticipantProfile || otherParticipant)?.role || 'User'}
                   </span>
                 </div>
               </div>
