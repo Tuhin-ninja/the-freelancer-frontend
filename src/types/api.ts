@@ -526,3 +526,83 @@ export interface CreateEventRequest {
   startTime: string;
   endTime: string;
 }
+
+// Task System Types
+export interface Task {
+  id: number;
+  roomId: number;
+  title: string;
+  description?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+  assigneeId: number;
+  assignee?: User;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskCreate {
+  title: string;
+  description?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  assigneeId: number;
+  dueDate?: string;
+}
+
+export interface TaskUpdate {
+  title?: string;
+  description?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  status?: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE';
+  assigneeId?: number;
+  dueDate?: string;
+}
+
+export interface TaskListResponse {
+  tasks: Task[];
+  totalCount: number;
+}
+
+// Contract Submission System Types
+export interface ContractSubmission {
+  id: number;
+  contractId: number;
+  jobTitle: string;
+  clientId: number;
+  freelancerId: number;
+  description: string;
+  deliverableUrls: string[];
+  notes?: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  submittedAt: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  feedback?: string;
+  submissionDescription: string;
+  submissionNotes?: string;
+  rejectionReason?: string;
+  rejectionFeedback?: string;
+  contractStatus: string;
+  isSubmitted: boolean;
+  isAccepted: boolean;
+  isRejected: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractSubmissionRequest {
+  description: string;
+  deliverableUrls: string[];
+  notes?: string;
+}
+
+export interface ContractRejectRequest {
+  reason: string;
+  feedback: string;
+  pauseContract?: boolean;
+}
+
+export interface ContractAcceptRequest {
+  feedback?: string; // Optional feedback when accepting
+}
