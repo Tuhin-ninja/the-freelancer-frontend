@@ -95,6 +95,8 @@ const WorkspacePage = () => {
     });
     const [submittingContract, setSubmittingContract] = useState(false);
     const [reviewingSubmission, setReviewingSubmission] = useState<number | null>(null);
+    const [freelancerStripeAccountId, setFreelancerStripeAccountId] = useState<string | null>(null);
+    const [showStripeInfo, setShowStripeInfo] = useState(false);
 
     // Now you can use proposalAmount and proposalId anywhere in your component
     useEffect(() => {
@@ -453,10 +455,34 @@ const WorkspacePage = () => {
     };
 
     const handleAcceptSubmission = async (feedback?: string) => {
-        if (!submission) return;
+        if (!submission || !contract) return;
         setReviewingSubmission(submission.id);
         try {
+            // Accept the submission first
             await contractService.acceptSubmission(contractId, { feedback });
+            
+            // Release escrow money to freelancer
+            try {
+                await contractService.releaseEscrowMoney(contractId);
+                toast.success('Escrow money released to freelancer!', {
+                    duration: 5000,
+                    style: {
+                        background: '#059669',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    }
+                });
+            } catch (escrowError) {
+                console.error('Error releasing escrow money:', escrowError);
+                toast.error('Submission accepted, but failed to release escrow money. Please contact support.', {
+                    duration: 8000
+                });
+            }
+            
+            // Fetch freelancer's Stripe account ID
+            const freelancerData = await userService.getUserById(contract.freelancerId);
+            
             setSubmission(prev => prev ? {
                 ...prev,
                 status: 'ACCEPTED',
@@ -464,7 +490,33 @@ const WorkspacePage = () => {
                 acceptedAt: new Date().toISOString(),
                 feedback: feedback
             } : null);
+            
+            // Set the Stripe account ID and show the info
+            setFreelancerStripeAccountId(freelancerData.stripeAccountId || null);
+            setShowStripeInfo(true);
+            
             toast.success('Submission accepted successfully!');
+            
+            // Show Stripe account ID in a more prominent way if available
+            if (freelancerData.stripeAccountId) {
+                toast.success(`Freelancer's Stripe Account ID: ${freelancerData.stripeAccountId}`, {
+                    duration: 8000,
+                    style: {
+                        background: '#10B981',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    }
+                });
+            } else {
+                toast('Freelancer has not set up Stripe account yet', {
+                    icon: 'ℹ️',
+                    style: {
+                        background: '#3B82F6',
+                        color: 'white',
+                    }
+                });
+            }
         } catch (error) {
             console.error('Error accepting submission:', error);
             toast.error('Failed to accept submission');
@@ -1030,93 +1082,133 @@ const WorkspacePage = () => {
             case 'tasks':
                 return (
                     <div>
-                        {/* Header with Create Button */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
-                            <div>
-                                <h2 className="text-gray-800 text-3xl font-bold mb-2">Tasks & Deliverables</h2>
-                                <p className="text-gray-600">Manage and track project tasks efficiently</p>
+                        {/* Enhanced Header with Create Button */}
+                        <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-3xl p-8 mb-8 border border-slate-200 shadow-sm">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between space-y-6 md:space-y-0">
+                                <div className="space-y-3">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 rounded-2xl shadow-lg">
+                                            <Briefcase className="w-7 h-7 text-white" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                                                Tasks & Deliverables
+                                            </h2>
+                                            <p className="text-slate-700 text-lg font-medium mt-1">
+                                                Manage and track project milestones with precision
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-4 text-sm">
+                                        <div className="flex items-center space-x-2 bg-white/70 px-3 py-2 rounded-lg">
+                                            <Clock className="w-4 h-4 text-blue-600" />
+                                            <span className="text-slate-700 font-medium">Real-time Progress</span>
+                                        </div>
+                                        <div className="flex items-center space-x-2 bg-white/70 px-3 py-2 rounded-lg">
+                                            <TrendingUp className="w-4 h-4 text-green-600" />
+                                            <span className="text-slate-700 font-medium">Smart Analytics</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowCreateTask(true)}
+                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-bold transition-all transform hover:scale-105 hover:shadow-xl flex items-center space-x-3 shadow-lg border border-blue-500/20"
+                                >
+                                    <div className="bg-white/20 p-1 rounded-lg">
+                                        <Plus className="w-5 h-5" />
+                                    </div>
+                                    <span>Create New Task</span>
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setShowCreateTask(true)}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center space-x-2 shadow-lg"
-                            >
-                                <Plus className="w-5 h-5" />
-                                <span>Add New Task</span>
-                            </button>
                         </div>
 
-                        {/* Search and Filter Bar */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {/* Search Input */}
-                                <div className="lg:col-span-2">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search tasks..."
-                                            value={taskSearchQuery}
-                                            onChange={(e) => setTaskSearchQuery(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                        />
+                        {/* Enhanced Search and Filter Bar */}
+                        <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border border-slate-200 p-8 mb-8">
+                            <div className="space-y-6">
+                                <div className="flex items-center space-x-3 mb-6">
+                                    <div className="bg-gradient-to-r from-slate-100 to-blue-100 p-2 rounded-xl">
+                                        <Search className="w-5 h-5 text-slate-700" />
+                                    </div>
+                                    <h3 className="text-slate-900 text-xl font-bold">Filter & Search Tasks</h3>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {/* Enhanced Search Input */}
+                                    <div className="lg:col-span-2">
+                                        <label className="block text-sm font-semibold text-slate-800 mb-2">Search Tasks</label>
+                                        <div className="relative group">
+                                            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search by title, description..."
+                                                value={taskSearchQuery}
+                                                onChange={(e) => setTaskSearchQuery(e.target.value)}
+                                                className="w-full pl-12 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 placeholder-slate-500 bg-slate-50/50 focus:bg-white font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Enhanced Status Filter */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-800 mb-2">Status Filter</label>
+                                        <select
+                                            value={taskStatusFilter}
+                                            onChange={(e) => setTaskStatusFilter(e.target.value)}
+                                            className="w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 bg-slate-50/50 focus:bg-white font-medium"
+                                        >
+                                            <option value="ALL">All Status</option>
+                                            <option value="TODO">📋 To Do</option>
+                                            <option value="IN_PROGRESS">⚡ In Progress</option>
+                                            <option value="IN_REVIEW">👁️ In Review</option>
+                                            <option value="DONE">✅ Done</option>
+                                        </select>
+                                    </div>
+                                    
+                                    {/* Enhanced Priority Filter */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-800 mb-2">Priority Level</label>
+                                        <select
+                                            value={taskPriorityFilter}
+                                            onChange={(e) => setTaskPriorityFilter(e.target.value)}
+                                            className="w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 bg-slate-50/50 focus:bg-white font-medium"
+                                        >
+                                            <option value="ALL">All Priority</option>
+                                            <option value="HIGH">🔴 High Priority</option>
+                                            <option value="MEDIUM">🟡 Medium Priority</option>
+                                            <option value="LOW">🟢 Low Priority</option>
+                                        </select>
                                     </div>
                                 </div>
                                 
-                                {/* Status Filter */}
-                                <div>
-                                    <select
-                                        value={taskStatusFilter}
-                                        onChange={(e) => setTaskStatusFilter(e.target.value)}
-                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                    >
-                                        <option value="ALL">All Status</option>
-                                        <option value="TODO">📋 To Do</option>
-                                        <option value="IN_PROGRESS">⚡ In Progress</option>
-                                        <option value="IN_REVIEW">👁️ In Review</option>
-                                        <option value="DONE">✅ Done</option>
-                                    </select>
-                                </div>
-                                
-                                {/* Priority Filter */}
-                                <div>
-                                    <select
-                                        value={taskPriorityFilter}
-                                        onChange={(e) => setTaskPriorityFilter(e.target.value)}
-                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                    >
-                                        <option value="ALL">All Priority</option>
-                                        <option value="HIGH">🔴 High</option>
-                                        <option value="MEDIUM">🟡 Medium</option>
-                                        <option value="LOW">🟢 Low</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            {/* Sort Options */}
-                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                                    <SortAsc className="w-4 h-4" />
-                                    <span>Sort by:</span>
-                                </div>
-                                <div className="flex space-x-2">
-                                    {[
-                                        { value: 'created', label: 'Created' },
-                                        { value: 'dueDate', label: 'Due Date' },
-                                        { value: 'priority', label: 'Priority' },
-                                        { value: 'title', label: 'Title' }
-                                    ].map((option) => (
-                                        <button
-                                            key={option.value}
-                                            onClick={() => setTaskSortBy(option.value as 'created' | 'dueDate' | 'priority' | 'title')}
-                                            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
-                                                taskSortBy === option.value
-                                                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                                    : 'text-gray-600 hover:bg-gray-100'
-                                            }`}
-                                        >
-                                            {option.label}
-                                        </button>
-                                    ))}
+                                {/* Enhanced Sort Options */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-6 border-t border-slate-200 space-y-4 sm:space-y-0">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="bg-gradient-to-r from-slate-100 to-blue-100 p-2 rounded-lg">
+                                            <SortAsc className="w-4 h-4 text-slate-700" />
+                                        </div>
+                                        <span className="text-slate-800 font-semibold">Sort Options:</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { value: 'created', label: 'Created Date', icon: '📅' },
+                                            { value: 'dueDate', label: 'Due Date', icon: '⏰' },
+                                            { value: 'priority', label: 'Priority', icon: '🎯' },
+                                            { value: 'title', label: 'Title', icon: '📝' }
+                                        ].map((option) => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => setTaskSortBy(option.value as 'created' | 'dueDate' | 'priority' | 'title')}
+                                                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all transform hover:scale-105 flex items-center space-x-2 ${
+                                                    taskSortBy === option.value
+                                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg border-2 border-blue-400'
+                                                        : 'text-slate-700 hover:bg-slate-100 border-2 border-slate-200 bg-white hover:border-slate-300'
+                                                }`}
+                                            >
+                                                <span>{option.icon}</span>
+                                                <span>{option.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1232,102 +1324,168 @@ const WorkspacePage = () => {
 
                         {/* Tasks List */}
                         {loadingTasks ? (
-                            <div className="flex items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                            <div className="flex flex-col items-center justify-center py-20">
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-3xl border border-blue-200 shadow-lg">
+                                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mb-6"></div>
+                                    <div className="text-center">
+                                        <h3 className="text-xl font-bold text-slate-900 mb-2">Loading Tasks</h3>
+                                        <p className="text-slate-600 font-medium">Fetching your project deliverables...</p>
+                                    </div>
+                                </div>
                             </div>
                         ) : filteredAndSortedTasks.length === 0 ? (
-                            <div className="text-center py-16">
+                            <div className="text-center py-20">
                                 {taskSearchQuery || taskStatusFilter !== 'ALL' || taskPriorityFilter !== 'ALL' ? (
-                                    <div>
-                                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                            <Search className="w-12 h-12 text-gray-400" />
+                                    <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-3xl p-12 max-w-lg mx-auto">
+                                        <div className="bg-gradient-to-br from-slate-100 to-slate-200 w-32 h-32 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
+                                            <Search className="w-16 h-16 text-slate-500" />
                                         </div>
-                                        <h3 className="text-xl font-semibold text-gray-800 mb-3">No tasks match your criteria</h3>
-                                        <p className="text-gray-500 mb-6 max-w-md mx-auto">Try adjusting your search terms or filters to find what you&apos;re looking for.</p>
+                                        <h3 className="text-2xl font-bold text-slate-900 mb-4">No matching tasks found</h3>
+                                        <p className="text-slate-700 font-medium mb-8 max-w-sm mx-auto leading-relaxed">
+                                            Try adjusting your search terms or filters to discover the tasks you&apos;re looking for.
+                                        </p>
                                         <button
                                             onClick={() => {
                                                 setTaskSearchQuery('');
                                                 setTaskStatusFilter('ALL');
                                                 setTaskPriorityFilter('ALL');
                                             }}
-                                            className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-medium transition-all inline-flex items-center space-x-2"
+                                            className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-8 py-4 rounded-2xl font-bold transition-all transform hover:scale-105 inline-flex items-center space-x-3 shadow-lg"
                                         >
                                             <X className="w-5 h-5" />
-                                            <span>Clear Filters</span>
+                                            <span>Clear All Filters</span>
                                         </button>
                                     </div>
                                 ) : (
-                                    <div>
-                                        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                            <Briefcase className="w-12 h-12 text-blue-500" />
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-12 max-w-lg mx-auto border border-blue-100">
+                                        <div className="bg-gradient-to-br from-blue-100 to-indigo-200 w-32 h-32 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
+                                            <Briefcase className="w-16 h-16 text-blue-600" />
                                         </div>
-                                        <h3 className="text-xl font-semibold text-gray-800 mb-3">No tasks created yet</h3>
-                                        <p className="text-gray-500 mb-6 max-w-md mx-auto">Get started by creating your first task to track project deliverables and manage your workflow efficiently.</p>
+                                        <h3 className="text-2xl font-bold text-slate-900 mb-4">Ready to get organized?</h3>
+                                        <p className="text-slate-700 font-medium mb-8 max-w-sm mx-auto leading-relaxed">
+                                            Create your first task to start tracking project deliverables and manage your workflow with precision.
+                                        </p>
                                         <button
                                             onClick={() => setShowCreateTask(true)}
-                                            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105 inline-flex items-center space-x-2"
+                                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-bold transition-all transform hover:scale-105 inline-flex items-center space-x-3 shadow-lg"
                                         >
                                             <Plus className="w-5 h-5" />
-                                            <span>Create First Task</span>
+                                            <span>Create Your First Task</span>
                                         </button>
                                     </div>
                                 )}
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {/* Task Statistics */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-blue-600 text-sm font-medium">Total Tasks</p>
-                                                <p className="text-2xl font-bold text-blue-800">{tasks.length}</p>
+                                {/* Enhanced Task Statistics */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.1 }}
+                                        className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-2xl border-2 border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-xl shadow-md">
+                                                <Briefcase className="w-6 h-6 text-white" />
                                             </div>
-                                            <div className="bg-blue-500 p-2 rounded-lg">
-                                                <Briefcase className="w-5 h-5 text-white" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl border border-yellow-200">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-yellow-600 text-sm font-medium">In Progress</p>
-                                                <p className="text-2xl font-bold text-yellow-800">{tasks.filter(t => t.status === 'IN_PROGRESS').length}</p>
-                                            </div>
-                                            <div className="bg-yellow-500 p-2 rounded-lg">
-                                                <AlertCircle className="w-5 h-5 text-white" />
+                                            <div className="text-right">
+                                                <p className="text-blue-700 text-sm font-bold uppercase tracking-wide">Total Tasks</p>
+                                                <p className="text-3xl font-black text-blue-900">{tasks.length}</p>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-purple-600 text-sm font-medium">In Review</p>
-                                                <p className="text-2xl font-bold text-purple-800">{tasks.filter(t => t.status === 'IN_REVIEW').length}</p>
+                                        <div className="bg-blue-200/50 h-2 rounded-full">
+                                            <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full w-full"></div>
+                                        </div>
+                                    </motion.div>
+                                    
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.2 }}
+                                        className="bg-gradient-to-br from-amber-50 to-orange-100 p-6 rounded-2xl border-2 border-amber-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-3 rounded-xl shadow-md">
+                                                <AlertCircle className="w-6 h-6 text-white" />
                                             </div>
-                                            <div className="bg-purple-500 p-2 rounded-lg">
-                                                <Eye className="w-5 h-5 text-white" />
+                                            <div className="text-right">
+                                                <p className="text-amber-700 text-sm font-bold uppercase tracking-wide">In Progress</p>
+                                                <p className="text-3xl font-black text-amber-900">{tasks.filter(t => t.status === 'IN_PROGRESS').length}</p>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-green-600 text-sm font-medium">Completed</p>
-                                                <p className="text-2xl font-bold text-green-800">{tasks.filter(t => t.status === 'DONE').length}</p>
+                                        <div className="bg-amber-200/50 h-2 rounded-full">
+                                            <div 
+                                                className="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-500"
+                                                style={{ width: `${tasks.length ? (tasks.filter(t => t.status === 'IN_PROGRESS').length / tasks.length) * 100 : 0}%` }}
+                                            ></div>
+                                        </div>
+                                    </motion.div>
+                                    
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.3 }}
+                                        className="bg-gradient-to-br from-purple-50 to-violet-100 p-6 rounded-2xl border-2 border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="bg-gradient-to-r from-purple-500 to-violet-500 p-3 rounded-xl shadow-md">
+                                                <Eye className="w-6 h-6 text-white" />
                                             </div>
-                                            <div className="bg-green-500 p-2 rounded-lg">
-                                                <CheckCircle className="w-5 h-5 text-white" />
+                                            <div className="text-right">
+                                                <p className="text-purple-700 text-sm font-bold uppercase tracking-wide">In Review</p>
+                                                <p className="text-3xl font-black text-purple-900">{tasks.filter(t => t.status === 'IN_REVIEW').length}</p>
                                             </div>
                                         </div>
-                                    </div>
+                                        <div className="bg-purple-200/50 h-2 rounded-full">
+                                            <div 
+                                                className="bg-gradient-to-r from-purple-500 to-violet-500 h-2 rounded-full transition-all duration-500"
+                                                style={{ width: `${tasks.length ? (tasks.filter(t => t.status === 'IN_REVIEW').length / tasks.length) * 100 : 0}%` }}
+                                            ></div>
+                                        </div>
+                                    </motion.div>
+                                    
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.4 }}
+                                        className="bg-gradient-to-br from-emerald-50 to-green-100 p-6 rounded-2xl border-2 border-emerald-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="bg-gradient-to-r from-emerald-500 to-green-500 p-3 rounded-xl shadow-md">
+                                                <CheckCircle className="w-6 h-6 text-white" />
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-emerald-700 text-sm font-bold uppercase tracking-wide">Completed</p>
+                                                <p className="text-3xl font-black text-emerald-900">{tasks.filter(t => t.status === 'DONE').length}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-emerald-200/50 h-2 rounded-full">
+                                            <div 
+                                                className="bg-gradient-to-r from-emerald-500 to-green-500 h-2 rounded-full transition-all duration-500"
+                                                style={{ width: `${tasks.length ? (tasks.filter(t => t.status === 'DONE').length / tasks.length) * 100 : 0}%` }}
+                                            ></div>
+                                        </div>
+                                    </motion.div>
                                 </div>
 
-                                {/* Results Count */}
-                                <div className="flex items-center justify-between mb-4">
-                                    <p className="text-gray-600">
-                                        Showing {filteredAndSortedTasks.length} of {tasks.length} tasks
-                                    </p>
+                                {/* Enhanced Results Count */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border border-slate-200 space-y-4 sm:space-y-0">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="bg-gradient-to-r from-slate-100 to-blue-100 p-2 rounded-xl">
+                                            <FileText className="w-5 h-5 text-slate-700" />
+                                        </div>
+                                        <div>
+                                            <p className="text-slate-900 font-bold text-lg">
+                                                Showing {filteredAndSortedTasks.length} of {tasks.length} tasks
+                                            </p>
+                                            <p className="text-slate-600 text-sm font-medium">
+                                                {tasks.length === 0 ? 'No tasks created yet' : 
+                                                 filteredAndSortedTasks.length === tasks.length ? 'All tasks displayed' :
+                                                 'Filtered results based on your criteria'}
+                                            </p>
+                                        </div>
+                                    </div>
                                     {(taskSearchQuery || taskStatusFilter !== 'ALL' || taskPriorityFilter !== 'ALL') && (
                                         <button
                                             onClick={() => {
@@ -1335,98 +1493,132 @@ const WorkspacePage = () => {
                                                 setTaskStatusFilter('ALL');
                                                 setTaskPriorityFilter('ALL');
                                             }}
-                                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                                            className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center space-x-2 shadow-lg"
                                         >
                                             <X className="w-4 h-4" />
-                                            <span>Clear all filters</span>
+                                            <span>Clear All Filters</span>
                                         </button>
                                     )}
                                 </div>
 
-                                {/* Tasks Grid */}
-                                <div className="grid gap-6">
-                                    {filteredAndSortedTasks.map((task) => (
+                                {/* Enhanced Tasks Grid */}
+                                <div className="grid gap-8">
+                                    {filteredAndSortedTasks.map((task, index) => (
                                         <motion.div
                                             key={task.id}
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group"
+                                            transition={{ delay: index * 0.1 }}
+                                            className="bg-white border-2 border-slate-200 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group hover:border-blue-300 hover:scale-[1.02]"
                                         >
-                                            {/* Task Header with Status Bar */}
-                                            <div className={`h-2 ${
-                                                task.status === 'DONE' ? 'bg-gradient-to-r from-green-400 to-green-600' :
-                                                task.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
-                                                task.status === 'IN_REVIEW' ? 'bg-gradient-to-r from-purple-400 to-purple-600' :
-                                                'bg-gradient-to-r from-gray-300 to-gray-400'
+                                            {/* Enhanced Task Header with Status Bar */}
+                                            <div className={`h-3 ${
+                                                task.status === 'DONE' ? 'bg-gradient-to-r from-emerald-400 via-green-500 to-green-600' :
+                                                task.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-600' :
+                                                task.status === 'IN_REVIEW' ? 'bg-gradient-to-r from-purple-400 via-purple-500 to-violet-600' :
+                                                'bg-gradient-to-r from-slate-300 via-slate-400 to-slate-500'
                                             }`}></div>
                                             
-                                            <div className="p-6">
-                                                <div className="flex items-start justify-between mb-4">
+                                            <div className="p-8">
+                                                <div className="flex items-start justify-between mb-6">
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center space-x-3 mb-3">
-                                                            <div className={`p-2 rounded-xl ${
-                                                                task.status === 'DONE' ? 'bg-green-100' :
-                                                                task.status === 'IN_PROGRESS' ? 'bg-blue-100' :
-                                                                task.status === 'IN_REVIEW' ? 'bg-purple-100' :
-                                                                'bg-gray-100'
+                                                        <div className="flex items-center space-x-4 mb-4">
+                                                            <div className={`p-3 rounded-2xl shadow-md ${
+                                                                task.status === 'DONE' ? 'bg-gradient-to-br from-emerald-100 to-green-200 border-2 border-emerald-300' :
+                                                                task.status === 'IN_PROGRESS' ? 'bg-gradient-to-br from-blue-100 to-indigo-200 border-2 border-blue-300' :
+                                                                task.status === 'IN_REVIEW' ? 'bg-gradient-to-br from-purple-100 to-violet-200 border-2 border-purple-300' :
+                                                                'bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-slate-300'
                                                             }`}>
                                                                 {getStatusIcon(task.status)}
                                                             </div>
                                                             <div className="flex-1">
-                                                                <h3 className="text-xl font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{task.title}</h3>
+                                                                <h3 className="text-2xl font-black text-slate-900 mb-2 group-hover:text-blue-700 transition-colors leading-tight">
+                                                                    {task.title}
+                                                                </h3>
                                                                 <div className="flex items-center space-x-3">
-                                                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getPriorityColor(task.priority)}`}>
-                                                                        {task.priority}
+                                                                    <span className={`px-4 py-2 text-sm font-bold rounded-xl shadow-sm ${getPriorityColor(task.priority)}`}>
+                                                                        {task.priority === 'HIGH' ? '🔴 High Priority' : 
+                                                                         task.priority === 'MEDIUM' ? '🟡 Medium Priority' : 
+                                                                         '🟢 Low Priority'}
                                                                     </span>
-                                                                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                                                                        task.status === 'DONE' ? 'bg-green-100 text-green-800' :
-                                                                        task.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                                                                        task.status === 'IN_REVIEW' ? 'bg-purple-100 text-purple-800' :
-                                                                        'bg-gray-100 text-gray-800'
+                                                                    <span className={`px-4 py-2 text-sm font-bold rounded-xl shadow-sm ${
+                                                                        task.status === 'DONE' ? 'bg-gradient-to-r from-emerald-100 to-green-200 text-emerald-800 border border-emerald-300' :
+                                                                        task.status === 'IN_PROGRESS' ? 'bg-gradient-to-r from-blue-100 to-indigo-200 text-blue-800 border border-blue-300' :
+                                                                        task.status === 'IN_REVIEW' ? 'bg-gradient-to-r from-purple-100 to-violet-200 text-purple-800 border border-purple-300' :
+                                                                        'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-800 border border-slate-300'
                                                                     }`}>
-                                                                        {task.status.replace('_', ' ')}
+                                                                        {task.status === 'IN_PROGRESS' ? '⚡ In Progress' :
+                                                                         task.status === 'IN_REVIEW' ? '👁️ In Review' :
+                                                                         task.status === 'DONE' ? '✅ Completed' :
+                                                                         '📋 To Do'}
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         
                                                         {task.description && (
-                                                            <p className="text-gray-600 leading-relaxed mb-4 bg-gray-50 p-3 rounded-lg">{task.description}</p>
+                                                            <div className="mb-6">
+                                                                <div className="bg-gradient-to-br from-slate-50 to-blue-50 p-5 rounded-2xl border border-slate-200">
+                                                                    <div className="flex items-center space-x-2 mb-3">
+                                                                        <FileText className="w-4 h-4 text-slate-600" />
+                                                                        <span className="text-slate-800 font-semibold text-sm">Description</span>
+                                                                    </div>
+                                                                    <p className="text-slate-800 leading-relaxed font-medium">{task.description}</p>
+                                                                </div>
+                                                            </div>
                                                         )}
                                                         
-                                                        <div className="flex items-center space-x-6 text-sm text-gray-500">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-medium">
                                                             {task.dueDate && (
-                                                                <div className="flex items-center space-x-1">
-                                                                    <Calendar className="w-4 h-4" />
-                                                                    <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                                                                <div className="bg-white/70 p-3 rounded-xl border border-slate-200 flex items-center space-x-3">
+                                                                    <div className="bg-blue-100 p-2 rounded-lg">
+                                                                        <Calendar className="w-4 h-4 text-blue-600" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-slate-600 text-xs font-semibold uppercase tracking-wide">Due Date</p>
+                                                                        <p className="text-slate-900 font-bold">{new Date(task.dueDate).toLocaleDateString('en-US', { 
+                                                                            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' 
+                                                                        })}</p>
+                                                                    </div>
                                                                 </div>
                                                             )}
-                                                            <div className="flex items-center space-x-1">
-                                                                <Clock className="w-4 h-4" />
-                                                                <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                                                            <div className="bg-white/70 p-3 rounded-xl border border-slate-200 flex items-center space-x-3">
+                                                                <div className="bg-slate-100 p-2 rounded-lg">
+                                                                    <Clock className="w-4 h-4 text-slate-600" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-slate-600 text-xs font-semibold uppercase tracking-wide">Created</p>
+                                                                    <p className="text-slate-900 font-bold">{new Date(task.createdAt).toLocaleDateString('en-US', { 
+                                                                        month: 'short', day: 'numeric', year: 'numeric' 
+                                                                    })}</p>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                     
-                                                    <div className="flex flex-col space-y-3 ml-4">
-                                                        {/* Status Update Dropdown */}
-                                                        <select
-                                                            value={task.status}
-                                                            onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE')}
-                                                            className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                                        >
-                                                            <option value="TODO">📋 To Do</option>
-                                                            <option value="IN_PROGRESS">⚡ In Progress</option>
-                                                            <option value="IN_REVIEW">👁️ In Review</option>
-                                                            <option value="DONE">✅ Done</option>
-                                                        </select>
+                                                    <div className="flex flex-col space-y-4 ml-6">
+                                                        {/* Enhanced Status Update Dropdown */}
+                                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                                            <label className="block text-slate-800 text-sm font-bold mb-3">Update Status</label>
+                                                            <select
+                                                                value={task.status}
+                                                                onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE')}
+                                                                className="w-full px-4 py-3 text-sm font-bold border-2 border-slate-300 rounded-xl bg-white hover:bg-slate-50 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                                                            >
+                                                                <option value="TODO">📋 To Do</option>
+                                                                <option value="IN_PROGRESS">⚡ In Progress</option>
+                                                                <option value="IN_REVIEW">👁️ In Review</option>
+                                                                <option value="DONE">✅ Completed</option>
+                                                            </select>
+                                                        </div>
                                                         
                                                         <button
                                                             onClick={() => handleDeleteTask(task.id)}
-                                                            className="p-3 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200 group"
+                                                            className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white p-4 rounded-2xl transition-all duration-200 group font-bold flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
                                                             title="Delete task"
                                                         >
                                                             <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                            <span>Delete</span>
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1795,71 +1987,129 @@ const WorkspacePage = () => {
                 );
             case 'payment':
                 return (
-                    <div className="space-y-8">
-                        {/* Header Section */}
-                        <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-700 rounded-2xl p-8 text-white relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full transform translate-x-16 -translate-y-16"></div>
-                            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full transform -translate-x-12 translate-y-12"></div>
+                    <div className="space-y-10">
+                        {/* Enhanced Header Section */}
+                        <div className="bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 rounded-3xl p-10 text-white relative overflow-hidden shadow-2xl">
+                            {/* Enhanced Background Elements */}
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-white/15 rounded-full transform translate-x-20 -translate-y-20 animate-pulse"></div>
+                            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/15 rounded-full transform -translate-x-16 translate-y-16 animate-pulse"></div>
+                            <div className="absolute top-1/2 left-1/2 w-24 h-24 bg-white/10 rounded-full transform -translate-x-12 -translate-y-12"></div>
                             
-                            <div className="relative z-10">
-                                <div className="flex items-center space-x-3 mb-4">
-                                    <div className="bg-white/20 p-3 rounded-xl">
-                                        <DollarSign className="w-6 h-6" />
+                            <div className="relative z-10 space-y-6">
+                                <div className="flex items-center space-x-4">
+                                    <div className="bg-white/25 p-4 rounded-2xl shadow-lg backdrop-blur-sm">
+                                        <DollarSign className="w-8 h-8 text-white" />
                                     </div>
-                                    <div>
-                                        <h2 className="text-2xl font-bold">Contract Submissions</h2>
-                                        <p className="text-green-100">Submit deliverables and manage project completion</p>
+                                    <div className="space-y-2">
+                                        <h2 className="text-4xl font-black text-white drop-shadow-lg">Contract Submissions</h2>
+                                        <p className="text-white/90 text-lg font-semibold">
+                                            Submit deliverables and manage project completion with precision
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                {/* Enhanced Info Cards */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+                                    <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl border border-white/30">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="bg-white/30 p-2 rounded-xl">
+                                                <Send className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-white/90 text-sm font-bold uppercase tracking-wide">Submit Work</p>
+                                                <p className="text-white text-lg font-black">Ready</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl border border-white/30">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="bg-white/30 p-2 rounded-xl">
+                                                <CheckCircle className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-white/90 text-sm font-bold uppercase tracking-wide">Track Progress</p>
+                                                <p className="text-white text-lg font-black">Live</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl border border-white/30">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="bg-white/30 p-2 rounded-xl">
+                                                <FileText className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-white/90 text-sm font-bold uppercase tracking-wide">Get Feedback</p>
+                                                <p className="text-white text-lg font-black">Instant</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Freelancer Submission Form */}
+                        {/* Enhanced Freelancer Submission Form */}
                         {user && contract && user.id === contract.freelancerId && (
-                            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 border-b border-gray-100">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                                            <div className="bg-blue-500 p-2 rounded-lg mr-3">
-                                                <Send className="w-5 h-5 text-white" />
+                            <div className="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden hover:shadow-3xl transition-all duration-300">
+                                <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-8 border-b-2 border-slate-200">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 rounded-2xl shadow-lg">
+                                                <Send className="w-7 h-7 text-white" />
                                             </div>
-                                            Submit Work
-                                        </h3>
+                                            <div>
+                                                <h3 className="text-2xl font-black text-slate-900">Submit Your Work</h3>
+                                                <p className="text-slate-700 font-semibold">Upload deliverables and provide detailed descriptions</p>
+                                            </div>
+                                        </div>
                                         {!showSubmissionForm && (
                                             <button
                                                 onClick={() => setShowSubmissionForm(true)}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-bold transition-all duration-200 flex items-center space-x-3 shadow-lg hover:shadow-xl transform hover:scale-105"
                                             >
-                                                <Plus className="w-4 h-4" />
-                                                <span>New Submission</span>
+                                                <div className="bg-white/20 p-1 rounded-lg">
+                                                    <Plus className="w-5 h-5" />
+                                                </div>
+                                                <span>Create New Submission</span>
                                             </button>
                                         )}
                                     </div>
                                 </div>
 
                                 {showSubmissionForm && (
-                                    <div className="p-6">
-                                        <div className="space-y-6">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Description <span className="text-red-500">*</span>
+                                    <div className="p-8 bg-gradient-to-br from-slate-50 to-blue-50">
+                                        <div className="space-y-8">
+                                            <div className="space-y-3">
+                                                <label className="flex items-center space-x-2 text-sm font-bold text-slate-900 mb-3">
+                                                    <FileText className="w-4 h-4 text-blue-600" />
+                                                    <span>Work Description <span className="text-red-600">*</span></span>
                                                 </label>
-                                                <textarea
-                                                    value={submissionForm.description}
-                                                    onChange={(e) => setSubmissionForm(prev => ({ ...prev, description: e.target.value }))}
-                                                    placeholder="Provide a detailed description of your work..."
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                    rows={4}
-                                                />
+                                                <div className="relative">
+                                                    <textarea
+                                                        value={submissionForm.description}
+                                                        onChange={(e) => setSubmissionForm(prev => ({ ...prev, description: e.target.value }))}
+                                                        placeholder="Provide a comprehensive description of your completed work, including key features, challenges overcome, and value delivered..."
+                                                        className="w-full px-6 py-4 border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none text-slate-900 placeholder-slate-500 bg-white/80 backdrop-blur-sm font-medium"
+                                                        rows={5}
+                                                    />
+                                                    <div className="absolute bottom-3 right-3 text-xs text-slate-500 font-medium">
+                                                        {submissionForm.description.length} characters
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Deliverable URLs
+                                            <div className="space-y-4">
+                                                <label className="flex items-center space-x-2 text-sm font-bold text-slate-900 mb-3">
+                                                    <Upload className="w-4 h-4 text-indigo-600" />
+                                                    <span>Deliverable URLs</span>
                                                 </label>
-                                                <div className="space-y-2">
+                                                <div className="space-y-3">
                                                     {submissionForm.deliverableUrls.map((url, index) => (
-                                                        <div key={index} className="flex items-center space-x-2">
+                                                        <div key={index} className="flex items-center space-x-3 bg-white/70 p-3 rounded-2xl border-2 border-slate-200">
+                                                            <div className="bg-blue-100 p-2 rounded-xl">
+                                                                <Upload className="w-4 h-4 text-blue-600" />
+                                                            </div>
                                                             <input
                                                                 type="url"
                                                                 value={url}
@@ -1868,8 +2118,8 @@ const WorkspacePage = () => {
                                                                     newUrls[index] = e.target.value;
                                                                     setSubmissionForm(prev => ({ ...prev, deliverableUrls: newUrls }));
                                                                 }}
-                                                                placeholder="https://example.com/deliverable"
-                                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                placeholder="https://drive.google.com/your-deliverable-link"
+                                                                className="flex-1 px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 placeholder-slate-500 font-medium"
                                                             />
                                                             <button
                                                                 type="button"
@@ -1877,7 +2127,7 @@ const WorkspacePage = () => {
                                                                     const newUrls = submissionForm.deliverableUrls.filter((_, i) => i !== index);
                                                                     setSubmissionForm(prev => ({ ...prev, deliverableUrls: newUrls }));
                                                                 }}
-                                                                className="text-red-600 hover:text-red-700 p-2"
+                                                                className="bg-red-100 hover:bg-red-200 text-red-700 p-3 rounded-xl transition-all hover:scale-105"
                                                             >
                                                                 <X className="w-4 h-4" />
                                                             </button>
@@ -1891,51 +2141,60 @@ const WorkspacePage = () => {
                                                                 deliverableUrls: [...prev.deliverableUrls, ''] 
                                                             }));
                                                         }}
-                                                        className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-medium"
+                                                        className="flex items-center space-x-3 text-blue-700 hover:text-blue-800 font-bold bg-blue-50 hover:bg-blue-100 p-4 rounded-2xl border-2 border-blue-200 hover:border-blue-300 transition-all w-full"
                                                     >
-                                                        <Plus className="w-4 h-4" />
-                                                        <span>Add URL</span>
+                                                        <Plus className="w-5 h-5" />
+                                                        <span>Add Another Deliverable URL</span>
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Additional Notes
+                                            <div className="space-y-3">
+                                                <label className="flex items-center space-x-2 text-sm font-bold text-slate-900 mb-3">
+                                                    <MessageCircle className="w-4 h-4 text-purple-600" />
+                                                    <span>Additional Notes</span>
                                                 </label>
-                                                <textarea
-                                                    value={submissionForm.notes}
-                                                    onChange={(e) => setSubmissionForm(prev => ({ ...prev, notes: e.target.value }))}
-                                                    placeholder="Any additional notes or comments..."
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                    rows={3}
-                                                />
+                                                <div className="relative">
+                                                    <textarea
+                                                        value={submissionForm.notes}
+                                                        onChange={(e) => setSubmissionForm(prev => ({ ...prev, notes: e.target.value }))}
+                                                        placeholder="Share any additional context, next steps, or special considerations for the client..."
+                                                        className="w-full px-6 py-4 border-2 border-slate-300 rounded-2xl focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all resize-none text-slate-900 placeholder-slate-500 bg-white/80 backdrop-blur-sm font-medium"
+                                                        rows={4}
+                                                    />
+                                                    <div className="absolute bottom-3 right-3 text-xs text-slate-500 font-medium">
+                                                        Optional
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center space-x-4">
+                                            <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 pt-6 border-t-2 border-slate-200">
                                                 <button
                                                     onClick={() => {
                                                         setShowSubmissionForm(false);
                                                         setSubmissionForm({ description: '', deliverableUrls: [], notes: '' });
                                                     }}
-                                                    className="flex-1 px-6 py-3 text-gray-700 font-semibold bg-gray-100 border border-gray-300 rounded-xl hover:bg-gray-200 hover:border-gray-400 transition-all duration-200"
+                                                    className="w-full sm:flex-1 px-8 py-4 text-slate-800 font-bold bg-slate-200 hover:bg-slate-300 border-2 border-slate-300 hover:border-slate-400 rounded-2xl transition-all duration-200 hover:scale-105 flex items-center justify-center space-x-2"
                                                 >
-                                                    Cancel
+                                                    <X className="w-5 h-5" />
+                                                    <span>Cancel Submission</span>
                                                 </button>
                                                 <button
                                                     onClick={handleSubmitContract}
                                                     disabled={submittingContract || !submissionForm.description.trim()}
-                                                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="w-full sm:flex-1 px-8 py-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-2xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 hover:scale-105 shadow-lg"
                                                 >
                                                     {submittingContract ? (
                                                         <>
-                                                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                                            <span>Submitting...</span>
+                                                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                                                            <span>Submitting Work...</span>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Send className="w-5 h-5" />
-                                                            <span>Submit Work</span>
+                                                            <div className="bg-white/20 p-1 rounded-lg">
+                                                                <Send className="w-5 h-5" />
+                                                            </div>
+                                                            <span>Submit Work for Review</span>
                                                         </>
                                                     )}
                                                 </button>
@@ -1946,127 +2205,279 @@ const WorkspacePage = () => {
                             </div>
                         )}
 
-                        {/* Submissions List */}
-                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                            <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 border-b border-gray-100">
-                                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                                    <div className="bg-purple-500 p-2 rounded-lg mr-3">
-                                        <FileText className="w-5 h-5 text-white" />
+                        {/* Enhanced Submissions Status */}
+                        <div className="bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden hover:shadow-3xl transition-all duration-300">
+                            <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-rose-50 p-8 border-b-2 border-slate-200">
+                                <div className="flex items-center space-x-4">
+                                    <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-4 rounded-2xl shadow-lg">
+                                        <FileText className="w-7 h-7 text-white" />
                                     </div>
-                                    Submission Status
-                                </h3>
+                                    <div className="space-y-2">
+                                        <h3 className="text-2xl font-black text-slate-900">Submission Status</h3>
+                                        <p className="text-slate-700 font-semibold">Track your work submissions and client feedback</p>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="p-6">
+                            <div className="p-8">
                                 {loadingSubmissions ? (
-                                    <div className="flex items-center justify-center py-12">
-                                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                                    <div className="flex items-center justify-center py-16">
+                                        <div className="space-y-4 text-center">
+                                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent mx-auto"></div>
+                                            <p className="text-slate-700 font-semibold">Loading submission status...</p>
+                                        </div>
                                     </div>
                                 ) : !submission ? (
-                                    <div className="text-center py-12">
-                                        <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                                        <h3 className="text-xl font-bold text-gray-900 mb-2">No submission yet</h3>
-                                        <p className="text-gray-600">
-                                            {user && contract && user.id === contract.freelancerId
-                                                ? "Submit your first deliverable to get started."
-                                                : "Waiting for freelancer to submit work."}
-                                        </p>
+                                    <div className="text-center py-20">
+                                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-12 max-w-lg mx-auto">
+                                            <div className="bg-gradient-to-br from-purple-100 to-pink-200 w-32 h-32 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
+                                                <FileText className="h-16 w-16 text-purple-600" />
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-slate-900 mb-4">Ready to Submit?</h3>
+                                            <p className="text-slate-700 font-medium mb-8 max-w-sm mx-auto leading-relaxed">
+                                                {user && contract && user.id === contract.freelancerId
+                                                    ? "Submit your first deliverable to showcase your amazing work and get client feedback."
+                                                    : "We're waiting for the freelancer to submit their completed work for your review."}
+                                            </p>
+                                            {user && contract && user.id === contract.freelancerId && (
+                                                <button
+                                                    onClick={() => setShowSubmissionForm(true)}
+                                                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 rounded-2xl font-bold transition-all transform hover:scale-105 inline-flex items-center space-x-3 shadow-lg"
+                                                >
+                                                    <Plus className="w-5 h-5" />
+                                                    <span>Create First Submission</span>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="space-y-6">
+                                    <div className="space-y-8">
                                         <motion.div
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ duration: 0.3 }}
-                                            className="border border-gray-200 rounded-xl overflow-hidden"
+                                            className="border-2 border-slate-200 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
                                         >
-                                            <div className="p-6">
-                                                <div className="flex items-start justify-between mb-4">
+                                            <div className="p-8 bg-gradient-to-br from-slate-50 to-blue-50">
+                                                <div className="flex items-start justify-between mb-8">
                                                     <div className="flex-1">
-                                                        {/* Submission Status with Enhanced Information */}
-                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                                            <div className={`p-4 rounded-lg border-2 ${
-                                                                submission.isSubmitted ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
-                                                            }`}>
-                                                                <div className="flex items-center space-x-2 mb-2">
-                                                                    {submission.isSubmitted ? (
-                                                                        <CheckCircle className="w-5 h-5 text-green-600" />
-                                                                    ) : (
-                                                                        <Circle className="w-5 h-5 text-gray-400" />
-                                                                    )}
-                                                                    <span className="font-semibold text-gray-900">Submitted</span>
+                                                        {/* Enhanced Submission Status Grid */}
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                                            <motion.div 
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                transition={{ delay: 0.1 }}
+                                                                className={`p-6 rounded-2xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                                                                    submission.isSubmitted 
+                                                                        ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-100' 
+                                                                        : 'border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100'
+                                                                }`}>
+                                                                <div className="flex items-center space-x-3 mb-3">
+                                                                    <div className={`p-2 rounded-xl ${
+                                                                        submission.isSubmitted ? 'bg-emerald-200' : 'bg-slate-200'
+                                                                    }`}>
+                                                                        {submission.isSubmitted ? (
+                                                                            <CheckCircle className="w-6 h-6 text-emerald-700" />
+                                                                        ) : (
+                                                                            <Circle className="w-6 h-6 text-slate-500" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-black text-slate-900 text-lg">Submitted</span>
+                                                                        <p className="text-sm font-semibold text-slate-700">
+                                                                            {submission.isSubmitted 
+                                                                                ? new Date(submission.submittedAt).toLocaleDateString('en-US', { 
+                                                                                    weekday: 'short', month: 'short', day: 'numeric' 
+                                                                                })
+                                                                                : 'Not submitted yet'
+                                                                            }
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
-                                                                <p className="text-sm text-gray-600">
-                                                                    {submission.isSubmitted 
-                                                                        ? new Date(submission.submittedAt).toLocaleDateString()
-                                                                        : 'Not submitted'
-                                                                    }
-                                                                </p>
-                                                            </div>
+                                                            </motion.div>
 
-                                                            <div className={`p-4 rounded-lg border-2 ${
-                                                                submission.isAccepted ? 'border-green-200 bg-green-50' : 
-                                                                submission.isRejected ? 'border-red-200 bg-red-50' : 
-                                                                'border-gray-200 bg-gray-50'
-                                                            }`}>
-                                                                <div className="flex items-center space-x-2 mb-2">
-                                                                    {submission.isAccepted ? (
-                                                                        <CheckCircle className="w-5 h-5 text-green-600" />
-                                                                    ) : submission.isRejected ? (
-                                                                        <X className="w-5 h-5 text-red-600" />
-                                                                    ) : (
-                                                                        <AlertCircle className="w-5 h-5 text-yellow-600" />
-                                                                    )}
-                                                                    <span className="font-semibold text-gray-900">Review Status</span>
+                                                            <motion.div 
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                transition={{ delay: 0.2 }}
+                                                                className={`p-6 rounded-2xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                                                                    submission.isAccepted ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-100' : 
+                                                                    submission.isRejected ? 'border-red-300 bg-gradient-to-br from-red-50 to-red-100' : 
+                                                                    'border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-100'
+                                                                }`}>
+                                                                <div className="flex items-center space-x-3 mb-3">
+                                                                    <div className={`p-2 rounded-xl ${
+                                                                        submission.isAccepted ? 'bg-emerald-200' : 
+                                                                        submission.isRejected ? 'bg-red-200' : 'bg-amber-200'
+                                                                    }`}>
+                                                                        {submission.isAccepted ? (
+                                                                            <CheckCircle className="w-6 h-6 text-emerald-700" />
+                                                                        ) : submission.isRejected ? (
+                                                                            <X className="w-6 h-6 text-red-700" />
+                                                                        ) : (
+                                                                            <AlertCircle className="w-6 h-6 text-amber-700" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-black text-slate-900 text-lg">Review Status</span>
+                                                                        <p className="text-sm font-semibold text-slate-700">
+                                                                            {submission.isAccepted ? '✅ Accepted' : 
+                                                                             submission.isRejected ? '❌ Rejected' : 
+                                                                             '⏳ Pending Review'}
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
-                                                                <p className="text-sm text-gray-600">
-                                                                    {submission.isAccepted ? 'Accepted' : 
-                                                                     submission.isRejected ? 'Rejected' : 
-                                                                     'Pending Review'}
-                                                                </p>
-                                                            </div>
+                                                            </motion.div>
 
-                                                            <div className={`p-4 rounded-lg border-2 ${
-                                                                submission.contractStatus === 'COMPLETED' ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'
-                                                            }`}>
-                                                                <div className="flex items-center space-x-2 mb-2">
+                                                            <motion.div 
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                transition={{ delay: 0.3 }}
+                                                                className={`p-6 rounded-2xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                                                                    submission.contractStatus === 'COMPLETED' 
+                                                                        ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-100' 
+                                                                        : 'border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100'
+                                                                }`}>
+                                                                <div className="flex items-center space-x-3 mb-3">
+                                                                    <div className={`p-2 rounded-xl ${
+                                                                        submission.contractStatus === 'COMPLETED' ? 'bg-blue-200' : 'bg-slate-200'
+                                                                    }`}>
+                                                                        <Briefcase className={`w-6 h-6 ${
+                                                                            submission.contractStatus === 'COMPLETED' ? 'text-blue-700' : 'text-slate-500'
+                                                                        }`} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="font-black text-slate-900 text-lg">Contract</span>
+                                                                        <p className="text-sm font-semibold text-slate-700">
+                                                                            {submission.contractStatus === 'COMPLETED' ? '🎉 Completed' : '🔄 Active'}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </motion.div>
+                                                        </div>
+
+                                                        {/* Enhanced Project Information */}
+                                                        <div className="mb-8 bg-white/70 p-6 rounded-2xl border-2 border-slate-200">
+                                                            <div className="flex items-center space-x-3 mb-4">
+                                                                <div className="bg-blue-100 p-2 rounded-xl">
                                                                     <Briefcase className="w-5 h-5 text-blue-600" />
-                                                                    <span className="font-semibold text-gray-900">Contract</span>
                                                                 </div>
-                                                                <p className="text-sm text-gray-600">
-                                                                    {submission.contractStatus}
-                                                                </p>
+                                                                <h4 className="font-black text-slate-900 text-xl">Project Details</h4>
                                                             </div>
+                                                            <p className="text-slate-800 text-lg font-semibold">{submission.jobTitle}</p>
                                                         </div>
 
-                                                        {/* Project Information */}
-                                                        <div className="mb-4">
-                                                            <h4 className="font-semibold text-gray-900 mb-2">Project:</h4>
-                                                            <p className="text-gray-700 text-lg">{submission.jobTitle}</p>
+                                                        {/* Stripe Account Information - Only show when submission is accepted and for clients */}
+                                                        {submission.isAccepted && user && contract && user.id === contract.clientId && showStripeInfo && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                                transition={{ duration: 0.5, type: "spring" }}
+                                                                className="mb-8 bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100 border-2 border-emerald-300 p-8 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300"
+                                                            >
+                                                                <div className="flex items-center space-x-4 mb-6">
+                                                                    <div className="bg-gradient-to-r from-emerald-500 to-green-600 p-3 rounded-2xl shadow-lg">
+                                                                        <DollarSign className="w-7 h-7 text-white" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <h4 className="font-black text-slate-900 text-2xl mb-1">Payment Information</h4>
+                                                                        <p className="text-emerald-700 font-semibold">Freelancer's Stripe Account Details</p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {freelancerStripeAccountId ? (
+                                                                    <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl border-2 border-emerald-200 shadow-inner">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex-1">
+                                                                                <label className="block text-sm font-bold text-slate-700 mb-2">
+                                                                                    Stripe Account ID
+                                                                                </label>
+                                                                                <div className="bg-slate-100 p-4 rounded-xl border border-slate-300 font-mono text-lg text-slate-900 break-all">
+                                                                                    {freelancerStripeAccountId}
+                                                                                </div>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    navigator.clipboard.writeText(freelancerStripeAccountId);
+                                                                                    toast.success('Stripe Account ID copied to clipboard!');
+                                                                                }}
+                                                                                className="ml-4 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold transition-all hover:scale-105 flex items-center space-x-2 shadow-md"
+                                                                                title="Copy to clipboard"
+                                                                            >
+                                                                                <FileText className="w-4 h-4" />
+                                                                                <span>Copy</span>
+                                                                            </button>
+                                                                        </div>
+                                                                        <div className="mt-4 p-3 bg-emerald-100 rounded-xl border border-emerald-200">
+                                                                            <p className="text-emerald-800 text-sm font-medium flex items-center">
+                                                                                <CheckCircle className="w-4 h-4 mr-2" />
+                                                                                Ready for payment processing via Stripe
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="bg-amber-50 p-6 rounded-2xl border-2 border-amber-200 shadow-inner">
+                                                                        <div className="flex items-center space-x-3">
+                                                                            <AlertCircle className="w-6 h-6 text-amber-600" />
+                                                                            <div>
+                                                                                <h5 className="font-bold text-amber-800 text-lg">Stripe Account Not Set Up</h5>
+                                                                                <p className="text-amber-700 font-medium">
+                                                                                    The freelancer hasn't configured their Stripe account yet. 
+                                                                                    Please contact them to complete payment setup.
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="mt-6 flex justify-end">
+                                                                    <button
+                                                                        onClick={() => setShowStripeInfo(false)}
+                                                                        className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105 flex items-center space-x-2"
+                                                                    >
+                                                                        <X className="w-4 h-4" />
+                                                                        <span>Hide Payment Info</span>
+                                                                    </button>
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+
+                                                        {/* Enhanced Submission Description */}
+                                                        <div className="mb-8 bg-white/70 p-6 rounded-2xl border-2 border-slate-200">
+                                                            <div className="flex items-center space-x-3 mb-4">
+                                                                <div className="bg-green-100 p-2 rounded-xl">
+                                                                    <FileText className="w-5 h-5 text-green-600" />
+                                                                </div>
+                                                                <h4 className="font-black text-slate-900 text-xl">Work Description</h4>
+                                                            </div>
+                                                            <p className="text-slate-800 font-medium leading-relaxed">{submission.submissionDescription}</p>
                                                         </div>
 
-                                                        {/* Submission Description */}
-                                                        <div className="mb-4">
-                                                            <h4 className="font-semibold text-gray-900 mb-2">Submission Description:</h4>
-                                                            <p className="text-gray-700">{submission.submissionDescription}</p>
-                                                        </div>
-
-                                                        {/* Deliverable URLs */}
+                                                        {/* Enhanced Deliverable URLs */}
                                                         {submission.deliverableUrls && submission.deliverableUrls.length > 0 && (
-                                                            <div className="mb-4">
-                                                                <h4 className="font-semibold text-gray-900 mb-2">Deliverable URLs:</h4>
-                                                                <div className="space-y-2">
+                                                            <div className="mb-8 bg-white/70 p-6 rounded-2xl border-2 border-slate-200">
+                                                                <div className="flex items-center space-x-3 mb-4">
+                                                                    <div className="bg-purple-100 p-2 rounded-xl">
+                                                                        <Upload className="w-5 h-5 text-purple-600" />
+                                                                    </div>
+                                                                    <h4 className="font-black text-slate-900 text-xl">Deliverable Links</h4>
+                                                                </div>
+                                                                <div className="space-y-3">
                                                                     {submission.deliverableUrls.map((url, index) => (
                                                                         <a
                                                                             key={index}
                                                                             href={url}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
-                                                                            className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 bg-blue-50 p-3 rounded-lg hover:bg-blue-100 transition-colors"
+                                                                            className="flex items-center space-x-4 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-4 rounded-2xl border-2 border-blue-200 hover:border-blue-300 transition-all hover:scale-[1.02] shadow-sm hover:shadow-md"
                                                                         >
-                                                                            <Eye className="w-4 h-4" />
-                                                                            <span className="flex-1 truncate">{url}</span>
-                                                                            <FileDown className="w-4 h-4" />
+                                                                            <div className="bg-blue-200 p-2 rounded-xl">
+                                                                                <Eye className="w-5 h-5 text-blue-700" />
+                                                                            </div>
+                                                                            <span className="flex-1 truncate font-semibold">{url}</span>
+                                                                            <div className="bg-blue-200 p-2 rounded-xl">
+                                                                                <FileDown className="w-5 h-5 text-blue-700" />
+                                                                            </div>
                                                                         </a>
                                                                     ))}
                                                                 </div>
@@ -2130,7 +2541,7 @@ const WorkspacePage = () => {
                                                     </div>
 
                                                     {/* Client Review Actions */}
-                                                    {user && contract && user.id === contract.clientId && submission.status === 'PENDING' && !submission.isAccepted && !submission.isRejected && (
+                                                    {user && contract && user.id === contract.clientId && !submission.isAccepted && !submission.isRejected && (
                                                         <div className="ml-6 flex flex-col space-y-3">
                                                             <button
                                                                 onClick={() => {

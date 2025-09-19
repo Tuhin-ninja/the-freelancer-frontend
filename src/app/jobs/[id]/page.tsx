@@ -754,6 +754,7 @@ export default function JobDetailsPage() {
           deliveryDays: 0
         }}
         job={{
+          id: jobId,
           title: job?.title || job?.projectName || 'Unknown Job',
           currency: job?.currency || 'USD'
         }}

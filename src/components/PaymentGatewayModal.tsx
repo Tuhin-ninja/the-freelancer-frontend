@@ -69,6 +69,7 @@ interface PaymentGatewayModalProps {
     deliveryDays: number;
   };
   job: {
+    id: string | number;
     title: string;
     currency?: string;
   };
@@ -211,7 +212,7 @@ const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     try {
       // Call the actual payment API using the structure from Postman
       const paymentData = {
-        jobId: proposal.id, // Use proposal ID as job ID
+        jobId: Number(job.id), // Use actual job ID, converted to number
         amountCents: totalAmount * 100, // Convert to cents
         currency: "usd",
         paymentMethodId: `pm_card_${cardType.type}`,

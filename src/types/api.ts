@@ -271,6 +271,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   profilePicture?: string; // Optional profile picture property
+  stripeAccountId?: string | null; // Stripe account ID for payments
 }
 
 export interface LoginRequest {
