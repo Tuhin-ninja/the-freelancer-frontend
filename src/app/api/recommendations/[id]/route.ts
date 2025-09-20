@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from "@/config/api";
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +12,7 @@ export async function GET(
     const authHeader = request.headers.get('Authorization');
     
     // Forward request to backend
-    const response = await fetch(`http://localhost:8080/api/recommendations/${id}`, {
+    const response = await fetch(`${getBackendUrl()}/api/recommendations/${id}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

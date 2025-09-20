@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from "@/config/api";
 
 export async function GET(
   request: NextRequest,
@@ -18,7 +19,7 @@ export async function GET(
     }
 
     // Forward request to backend
-    const response = await fetch(`http://localhost:8080/api/notifications/user`, {
+    const response = await fetch(`${getBackendUrl()}/api/notifications/user`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

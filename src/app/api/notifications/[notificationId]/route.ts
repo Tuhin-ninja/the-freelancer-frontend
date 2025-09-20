@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from "@/config/api";
 
 export async function DELETE(
   request: NextRequest,
@@ -18,7 +19,7 @@ export async function DELETE(
     }
 
     // Forward request to backend
-    const response = await fetch(`http://localhost:8080/api/notifications/${notificationId}`, {
+    const response = await fetch(`${getBackendUrl()}/api/notifications/${notificationId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

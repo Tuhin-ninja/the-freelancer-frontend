@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
 import { loginSuccess } from "@/store/authSlice";
+import { getBackendUrl } from "@/config/api";
 import { 
   Sparkles, 
   TrendingUp, 
@@ -103,7 +104,7 @@ import {
       if (!isAuthenticated || !user) {
         try {
           const axios = (await import("axios")).default;
-          const response = await axios.get("http://localhost:8080/api/auth/me", {
+          const response = await axios.get(`${getBackendUrl()}/api/auth/me`, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
 
@@ -252,7 +253,7 @@ import {
       formData.append('file', selectedFile);
 
       const response = await axios.post(
-        "http://localhost:8080/api/gigs/create-with-media",
+        `${getBackendUrl()}/api/gigs/create-with-media`,
         formData,
         {
           headers: {

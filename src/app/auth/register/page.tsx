@@ -8,6 +8,7 @@ import { Eye, EyeOff, UserCircle, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { useAppDispatch } from '@/store/hooks';
 import { loginSuccess } from '@/store/authSlice';
 import { motion } from 'framer-motion';
+import { getBackendUrl } from '@/config/api';
 
 const SignupPage = () => {
   const router = require('next/navigation').useRouter();
@@ -33,7 +34,7 @@ const SignupPage = () => {
     setLoading(true); setError(''); setSuccess('');
 
     try {
-      const res = await fetch('http://localhost:8080/api/auth/register', {
+      const res = await fetch(`${getBackendUrl()}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -42,7 +43,7 @@ const SignupPage = () => {
 
       setSuccess('Registration successful! Logging you in...');
 
-      const loginRes = await fetch('http://localhost:8080/api/auth/login', {
+      const loginRes = await fetch(`${getBackendUrl()}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email, password: form.password }),

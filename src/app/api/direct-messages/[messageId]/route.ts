@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from "@/config/api";
 
 export async function PUT(
   request: NextRequest,
@@ -9,7 +10,7 @@ export async function PUT(
     const messageId = params.messageId;
     
     // Forward request to backend
-    const response = await fetch(`http://localhost:8080/api/direct-messages/${messageId}`, {
+    const response = await fetch(`${getBackendUrl()}/api/direct-messages/${messageId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

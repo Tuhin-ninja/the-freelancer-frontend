@@ -1,3 +1,5 @@
+import { getBackendUrl } from '@/config/api';
+
 export interface Notification {
   id: number;
   recipientId: number;
@@ -25,7 +27,7 @@ const notificationService = {
   getUserNotifications: async (userId: number): Promise<NotificationResponse> => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
-      const response = await fetch(`http://localhost:8080/api/notifications/user`, {
+      const response = await fetch(`${getBackendUrl()}/api/notifications/user`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +51,7 @@ const notificationService = {
   getUnreadCount: async (userId: number): Promise<{ count: number }> => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
-      const response = await fetch(`http://localhost:8080/api/notifications/user/unread/count`, {
+      const response = await fetch(`${getBackendUrl()}/api/notifications/user/unread/count`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -94,7 +96,7 @@ const notificationService = {
   markAllAsRead: async (userId: number): Promise<void> => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
-      const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}/read-all`, {
+      const response = await fetch(`${getBackendUrl()}/api/notifications/user/${userId}/read-all`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +117,7 @@ const notificationService = {
   deleteNotification: async (notificationId: number): Promise<void> => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
-      const response = await fetch(`http://localhost:8080/api/notifications/${notificationId}`, {
+      const response = await fetch(`${getBackendUrl()}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

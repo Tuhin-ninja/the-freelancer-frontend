@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -34,7 +34,7 @@ import jobService from '@/services/job';
 import { Job } from '@/types/api';
 import { toast } from 'react-hot-toast';
 
-export default function ProposalPage() {
+function ProposalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jobId = searchParams?.get('jobId');
@@ -756,3 +756,14 @@ Explain why you're the perfect fit for this job. Highlight your relevant experie
     </div>
   );
 }
+
+// Wrap the component with Suspense to handle useSearchParams
+function ProposalPageWithSuspense() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ProposalPage />
+    </Suspense>
+  );
+}
+
+export default ProposalPageWithSuspense;

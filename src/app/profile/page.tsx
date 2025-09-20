@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { motion } from 'framer-motion';
+import { getBackendUrl } from '@/config/api';
 import { 
   User, 
   Mail, 
@@ -67,7 +68,7 @@ const ProfilePage = () => {
         try {
           const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
           const axios = (await import('axios')).default;
-          const res = await axios.get(`http://localhost:8080/api/profiles/${user.id}`, {
+          const res = await axios.get(`${getBackendUrl()}/api/profiles/${user.id}`, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           setProfileData(res.data);

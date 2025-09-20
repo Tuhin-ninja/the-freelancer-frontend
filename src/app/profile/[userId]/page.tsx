@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { motion } from 'framer-motion';
+import { getBackendUrl } from '@/config/api';
 import { 
   User, 
   Mail, 
@@ -176,7 +177,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
       try {
         setGigsLoading(true);
-        const response = await fetch(`http://localhost:8080/api/gigs/user/${userId}`, {
+        const response = await fetch(`${getBackendUrl()}/api/gigs/user/${userId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
             'Content-Type': 'application/json',
@@ -392,6 +393,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
 
   const handleImageClick = () => {
     if (isOwnProfile) {
+      console.log('Khalid Hasan Tuhin')
       fileInputRef.current?.click();
     }
   };

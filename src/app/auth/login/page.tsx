@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useAppDispatch } from '@/hooks/redux';
 import { loginSuccess } from '@/store/authSlice';
 import { Eye, EyeOff, Briefcase, Mail, Lock } from 'lucide-react';
+import { getBackendUrl } from '@/config/api';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -32,7 +33,7 @@ export default function LoginPage() {
 
     try {
       const axios = (await import('axios')).default;
-      const res = await axios.post('http://localhost:8080/api/auth/login', formData, {
+      const res = await axios.post(`${getBackendUrl()}/api/auth/login`, formData, {
         headers: { 'Content-Type': 'application/json' },
       });
       dispatch(loginSuccess(res.data));

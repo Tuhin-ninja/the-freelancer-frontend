@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from "@/config/api";
+
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '${getBackendUrl()}';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
     // Forward request to backend
-    const response = await fetch('http://localhost:8080/api/direct-messages', {
+    const response = await fetch(`${BACKEND_URL}/api/direct-messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

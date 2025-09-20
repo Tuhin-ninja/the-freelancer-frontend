@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import ReviewModal from '@/components/ReviewModal';
 import reviewService from '@/services/review';
 import toast, { Toaster } from 'react-hot-toast';
+import { getBackendUrl } from '@/config/api';
 
 const ProjectsPage = () => {
   const router = useRouter();
@@ -32,7 +33,7 @@ const ProjectsPage = () => {
       try {
         const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
         const axios = (await import('axios')).default;
-        const res = await axios.get(`http://localhost:8080/api/contracts/my-contracts`, {
+        const res = await axios.get(`${getBackendUrl()}/api/contracts/my-contracts`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         
@@ -40,7 +41,7 @@ const ProjectsPage = () => {
         const projectsWithFreelancerInfo = await Promise.all(
           res.data.map(async (project: any) => {
             try {
-              const freelancerRes = await axios.get(`http://localhost:8080/api/auth/public/users/${project.freelancerId}`, {
+              const freelancerRes = await axios.get(`${getBackendUrl()}/api/auth/public/users/${project.freelancerId}`, {
                 headers: { Authorization: `Bearer ${accessToken}` },
               });
               return {

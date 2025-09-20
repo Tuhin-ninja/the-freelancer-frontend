@@ -8,8 +8,9 @@ import {
   CreateConversationRequest,
   PaginatedResponse 
 } from '@/types/api';
+import { getApiUrl } from '@/config/api';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api`;
 
 // Get authorization header with custom user headers
 const getAuthHeaders = () => {

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { logout } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
+import { getBackendUrl } from '@/config/api';
 import {
   User,
   Search,
@@ -32,7 +33,7 @@ const Navbar = () => {
     const fetchUserProfile = async () => {
       if (user?.id) {
         try {
-          const response = await fetch(`http://localhost:8080/api/auth/public/users/${user.id}`, {
+          const response = await fetch(`${getBackendUrl()}/api/auth/public/users/${user.id}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
               'Content-Type': 'application/json',

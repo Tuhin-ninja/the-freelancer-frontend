@@ -5,6 +5,7 @@ import { Briefcase, UserCircle, Plus, FileText, BarChart3, Settings, Star, Edit3
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import InviteFreelancerModal from '@/components/InviteFreelancerModal';
+import { getBackendUrl } from '@/config/api';
 
 const DashboardPage = () => {
   const router = useRouter();
@@ -31,10 +32,10 @@ const DashboardPage = () => {
       try {
         const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
         const axios = (await import('axios')).default;
-        const res = await axios.get(`http://localhost:8080/api/gigs/my-gigs`, {
+        const res = await axios.get(`${getBackendUrl()}/api/gigs/my-gigs`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
-        console.log("api is "+ `http://localhost:8080/api/gigs/my-gigs`);
+        console.log("api is "+ `${getBackendUrl()}/api/gigs/my-gigs`);
         console.log('user is', user);
         setGigs(res.data);
       } catch (err: any) {
@@ -52,7 +53,7 @@ const DashboardPage = () => {
       try {
         const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
         const axios = (await import('axios')).default;
-        const res = await axios.get(`http://localhost:8080/api/jobs/my-jobs`, {
+        const res = await axios.get(`${getBackendUrl()}/api/jobs/my-jobs`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         setJobs(res.data); // Replace with actual fetch logic

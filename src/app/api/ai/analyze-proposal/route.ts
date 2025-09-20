@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBackendUrl } from "@/config/api";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
     // Forward request to backend
-    const response = await fetch('http://localhost:8080/api/ai/analyze-proposal', {
+    const response = await fetch('${getBackendUrl()}/api/ai/analyze-proposal', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

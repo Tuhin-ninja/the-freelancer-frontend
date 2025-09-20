@@ -232,11 +232,12 @@
 
 import api from '@/lib/api';
 import { Job, Proposal, PaginatedResponse, Attachment } from '@/types/api';
+import { getApiUrl } from '@/config/api';
 import axios from 'axios';
 
 // Job Proposal Service API instance
 const jobProposalAPI = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -421,7 +422,7 @@ export const jobAPI = {
       };
 
       const response = await axios.post(
-        'http://localhost:8080/api/jobs/with-attachment',
+        getApiUrl('/api/jobs/with-attachment'),
         jobData,
         { headers }
       );
