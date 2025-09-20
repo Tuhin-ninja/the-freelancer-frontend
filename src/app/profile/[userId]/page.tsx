@@ -593,7 +593,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                   <button onClick={handleImageCancel} className="px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors">Cancel</button>
                 </div>
               )}
-              <h1 className="text-2xl font-bold text-gray-900 mt-4">{user?.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mt-4">{profileData?.name}</h1>
               <p className="text-blue-600 font-medium">{profileData?.headline}</p>
               <div className="flex items-center justify-center text-gray-500 mt-2">
                 <MapPin className="h-4 w-4 mr-1.5" />
@@ -914,7 +914,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             </div>
 
             {/* Reviews Section - Only for FREELANCERs */}
-            {user?.role === 'FREELANCER' && (
+            {profileData?.role === 'FREELANCER' && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1038,7 +1038,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             )}
 
             {/* Client Contracts Section */}
-            {isOwnProfile && user?.role === 'client' && (
+            {isOwnProfile && user?.role === 'CLIENT' && (
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1073,7 +1073,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             )}
 
             {/* Gigs Section */}
-            {user?.role === 'FREELANCER' && (
+            {/* {user?.role === 'FREELANCER' && ( */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1175,7 +1175,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                 </div>
               )}
             </motion.div>
-            )}
+            {/* // )} */}
 
           </div>
         </div>

@@ -31,6 +31,8 @@ export default function GigsPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     fetchGigs();
@@ -42,11 +44,13 @@ export default function GigsPage() {
       const response = await gigService.gigAPI.getAllGigs();
       console.log('Gigs API Response:', response);
       // Handle both paginated and direct array responses
-      const gigsData = Array.isArray(response) ? response : response.content || [];
+      const gigsData = Array.isArray(response) ? response : (response?.content || []);
       console.log('Gigs data structure:', gigsData.length > 0 ? gigsData[0] : 'No gigs');
-      setGigs(gigsData);
+      // Ensure we always set an array
+      setGigs(Array.isArray(gigsData) ? gigsData : []);
     } catch (error) {
       console.error('Error fetching gigs:', error);
+      // Ensure we always have an array, even on error
       setGigs([]);
     } finally {
       setLoading(false);
@@ -55,9 +59,34 @@ export default function GigsPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    // For now, just filter locally since there's no search endpoint
-    // In a real app, you'd call a search API
-    fetchGigs();
+    
+    if (!searchQuery.trim()) {
+      // If no search query, just fetch all gigs
+      fetchGigs();
+      return;
+    }
+
+    try {
+      setSearchLoading(true);
+      
+      if (isSemanticSearch) {
+        // Use semantic search
+        console.log('🔍 Performing semantic search for:', searchQuery);
+        const semanticResults = await gigService.gigAPI.semanticSearchGigs(searchQuery.trim());
+        console.log('🔍 Semantic search results:', semanticResults);
+        // Ensure we always set an array
+        setGigs(Array.isArray(semanticResults) ? semanticResults : []);
+      } else {
+        // Use regular search (fallback to filter local results for now)
+        fetchGigs();
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      // Fallback to regular fetch if search fails
+      fetchGigs();
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   const categories = [
@@ -77,10 +106,13 @@ export default function GigsPage() {
     { name: 'Game Development', icon: Star, gradient: 'from-cyan-400 to-blue-400' }
   ];
 
-  const filteredGigs = gigs.filter(gig => {
-    const matchesSearch = !searchQuery ||
-      gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      gig.description.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredGigs = (gigs || []).filter(gig => {
+    // If we used semantic search, don't filter further by search query as results are already semantic
+    const matchesSearch = isSemanticSearch && searchQuery ? true : (
+      !searchQuery ||
+      gig.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      gig.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     // Fix category filtering to match actual gig categories
     const matchesCategory = !selectedCategory || selectedCategory === 'All Categories' ||
@@ -88,6 +120,12 @@ export default function GigsPage() {
 
     return matchesSearch && matchesCategory;
   });
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setIsSemanticSearch(false);
+    fetchGigs();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
@@ -171,25 +209,106 @@ export default function GigsPage() {
               className="max-w-4xl mx-auto"
             >
               <div className="relative bg-white/10 backdrop-blur-lg rounded-3xl p-3 shadow-2xl border border-white/20">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="What service are you looking for?"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-12 pr-4 py-4 bg-white/90 backdrop-blur-sm text-gray-800 placeholder-gray-500 text-lg rounded-2xl border-0 focus:ring-4 focus:ring-white/30 shadow-lg transition-all duration-300"
-                    />
+                <div className="flex flex-col gap-4">
+                  {/* Search Input Row */}
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400" />
+                      <Input
+                        type="text"
+                        placeholder={isSemanticSearch ? "Try: 'mongodb database', 'react frontend', 'machine learning'..." : "What service are you looking for?"}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-12 pr-4 py-4 bg-white/90 backdrop-blur-sm text-gray-800 placeholder-gray-500 text-lg rounded-2xl border-0 focus:ring-4 focus:ring-white/30 shadow-lg transition-all duration-300"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={searchLoading}
+                      className="bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-600 hover:to-violet-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {searchLoading ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="mr-2 h-6 w-6 border-2 border-white border-t-transparent rounded-full"
+                          />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-6 w-6" />
+                          Search
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="bg-gradient-to-r from-pink-500 to-violet-500 hover:from-pink-600 hover:to-violet-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
-                  >
-                    <Search className="mr-2 h-6 w-6" />
-                    Search
-                  </Button>
+                  
+                  {/* Semantic Search Toggle */}
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <motion.button
+                      type="button"
+                      onClick={() => setIsSemanticSearch(!isSemanticSearch)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`flex items-center space-x-3 px-6 py-3 rounded-2xl font-semibold transition-all duration-300 ${
+                        isSemanticSearch
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                          : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md'
+                      }`}
+                    >
+                      <motion.div
+                        animate={{
+                          rotate: isSemanticSearch ? [0, 10, -10, 0] : 0,
+                          scale: isSemanticSearch ? [1, 1.1, 1] : 1
+                        }}
+                        transition={{
+                          duration: 0.5,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        <Sparkles className={`h-5 w-5 ${isSemanticSearch ? 'text-white' : 'text-purple-500'}`} />
+                      </motion.div>
+                      <span>
+                        {isSemanticSearch ? 'AI Semantic Search ON' : 'Enable AI Semantic Search'}
+                      </span>
+                      {isSemanticSearch && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="bg-white/20 px-2 py-1 rounded-lg text-xs"
+                        >
+                          BETA
+                        </motion.div>
+                      )}
+                    </motion.button>
+                    
+                    {/* Help text for semantic search */}
+                    {isSemanticSearch && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-center max-w-2xl"
+                      >
+                        <p className="text-white/80 text-sm">
+                          🧠 <strong>AI understands context!</strong> Try searching for concepts like "database optimization" or "frontend frameworks"
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2 mt-2">
+                          {['mongodb database', 'react frontend', 'machine learning', 'mobile app design'].map((example) => (
+                            <button
+                              key={example}
+                              onClick={() => setSearchQuery(example)}
+                              className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white/90 rounded-full text-xs font-medium transition-all duration-200 hover:scale-105"
+                            >
+                              {example}
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.form>
@@ -354,9 +473,21 @@ export default function GigsPage() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between">
                 <div className="mb-4 md:mb-0">
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
-                    {selectedCategory || 'All Services'}
-                  </h2>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                      {selectedCategory || 'All Services'}
+                    </h2>
+                    {searchQuery && isSemanticSearch && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-3 py-1 rounded-full text-sm font-semibold"
+                      >
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        AI Search
+                      </motion.div>
+                    )}
+                  </div>
                   <motion.p
                     key={filteredGigs.length}
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -366,8 +497,27 @@ export default function GigsPage() {
                     <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full text-sm font-bold mr-2">
                       {filteredGigs.length}
                     </span>
-                    premium service{filteredGigs.length !== 1 ? 's' : ''} available
+                    {searchQuery && isSemanticSearch ? (
+                      <>semantic results for "{searchQuery}"</>
+                    ) : searchQuery ? (
+                      <>results for "{searchQuery}"</>
+                    ) : (
+                      <>premium service{filteredGigs.length !== 1 ? 's' : ''} available</>
+                    )}
                   </motion.p>
+                  {searchQuery && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={clearSearch}
+                      className="mt-2 inline-flex items-center px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 rounded-full text-sm font-medium transition-all duration-200"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Clear search
+                    </motion.button>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-3">

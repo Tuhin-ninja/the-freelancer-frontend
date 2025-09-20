@@ -34,13 +34,16 @@ import {
   Zap,
   Shield,
   Wand2,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import contractService from '@/services/contract';
 import PaymentGatewayModal from '@/components/PaymentGatewayModal';
+import DiscardProposalModal from '@/components/DiscardProposalModal';
+import paymentService from '@/services/payment';
 
 type ProposalWithContract = Proposal & { contractId?: number };
 
@@ -66,6 +69,13 @@ export default function JobDetailsPage() {
   // AI Analysis State
   const [analyzingProposalId, setAnalyzingProposalId] = useState<number | null>(null);
   const [analysisResults, setAnalysisResults] = useState<{[key: number]: any}>({});
+
+  // Discard Proposal Modal State
+  const [discardModal, setDiscardModal] = useState<{
+    isOpen: boolean;
+    proposal: ProposalWithContract | null;
+  }>({ isOpen: false, proposal: null });
+  const [discardingProposalId, setDiscardingProposalId] = useState<number | null>(null);
 
   // Safe date formatting utility
   const safeFormatDate = (dateString: string | undefined) => {
@@ -222,6 +232,39 @@ export default function JobDetailsPage() {
       toast.error('Failed to analyze proposal. Please try again.');
     } finally {
       setAnalyzingProposalId(null);
+    }
+  };
+
+  const handleDiscardProposal = (proposal: ProposalWithContract) => {
+    setDiscardModal({ isOpen: true, proposal });
+  };
+
+  const confirmDiscardProposal = async (reason: string) => {
+    if (!discardModal.proposal || !job) return;
+
+    const proposal = discardModal.proposal;
+    setDiscardingProposalId(proposal.id);
+
+    try {
+      console.log('🗑️ Discarding proposal:', proposal.id, 'for job:', job.id);
+      
+      // Use the payment service to discard the proposal
+      await paymentService.discardProposal(job.id, reason);
+      
+      // Update the proposal status to DECLINED in the local state
+      setProposals(prev => prev.map(p => 
+        p.id === proposal.id ? { ...p, status: 'DECLINED' as const } : p
+      ));
+      
+      // Close the modal
+      setDiscardModal({ isOpen: false, proposal: null });
+      
+      toast.success('Proposal discarded successfully! Escrow funds have been refunded.');
+    } catch (error: any) {
+      console.error('Error discarding proposal:', error);
+      toast.error(error.message || 'Failed to discard proposal');
+    } finally {
+      setDiscardingProposalId(null);
     }
   };
 
@@ -573,14 +616,38 @@ export default function JobDetailsPage() {
               </div>
             </div>
           ) : proposal.status === 'CONTRACTED' ? (
-            <div className="flex items-center justify-center py-3">
-              <Button
-                onClick={() => router.push(`/workspace/${proposal.contractId || proposal.id}`)}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full font-semibold"
-              >
-                <Briefcase className="w-5 h-5 mr-2" />
-                Go to Workspace
-              </Button>
+            <div className="space-y-3">
+              <div className="flex">
+                <Button
+                  onClick={() => router.push(`/workspace/${proposal.contractId || proposal.id}`)}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full font-semibold"
+                >
+                  <Briefcase className="w-5 h-5 mr-2" />
+                  Go to Workspace
+                </Button>
+              </div>
+              
+              {/* Discard Contract Button */}
+              <div className="flex">
+                <Button
+                  onClick={() => handleDiscardProposal(proposal)}
+                  variant="outline"
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                  disabled={discardingProposalId === proposal.id}
+                >
+                  {discardingProposalId === proposal.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Cancelling Contract...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Cancel Contract
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           ) : proposal.status === 'REJECTED' ? (
             <div className="flex items-center justify-center py-3">
@@ -758,6 +825,16 @@ export default function JobDetailsPage() {
           title: job?.title || job?.projectName || 'Unknown Job',
           currency: job?.currency || 'USD'
         }}
+      />
+
+      {/* Discard Proposal Modal */}
+      <DiscardProposalModal
+        isOpen={discardModal.isOpen}
+        onClose={() => setDiscardModal({ isOpen: false, proposal: null })}
+        onConfirm={confirmDiscardProposal}
+        proposalId={discardModal.proposal?.id || 0}
+        freelancerName={discardModal.proposal?.freelancerInfo?.name || 'Unknown Freelancer'}
+        isLoading={discardingProposalId === discardModal.proposal?.id}
       />
     </div>
   );

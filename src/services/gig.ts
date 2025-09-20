@@ -36,6 +36,14 @@ export const gigAPI = {
     return response.data;
   },
 
+  // Semantic search gigs
+  semanticSearchGigs: async (query: string): Promise<Gig[]> => {
+    const response = await api.get('/api/gigs/search/semantic', { 
+      params: { q: query } 
+    });
+    return response.data;
+  },
+
   // Create new gig
   createGig: async (gigData: {
     title: string;

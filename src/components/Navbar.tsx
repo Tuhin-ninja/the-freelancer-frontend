@@ -174,7 +174,7 @@ const Navbar = () => {
                             </Link>
                           </>
                         )}
-                        {user?.role === 'client' && (
+                        {user?.role === 'CLIENT' && (
                           <Link href="/contracts" className="w-full">
                             <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
                               <FileText className="mr-2 h-4 w-4" />
