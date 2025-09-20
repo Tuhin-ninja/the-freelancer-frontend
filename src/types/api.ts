@@ -609,3 +609,21 @@ export interface ContractRejectRequest {
 export interface ContractAcceptRequest {
   feedback?: string; // Optional feedback when accepting
 }
+
+// Matched Freelancer Interface for Smart Matching
+export interface MatchedFreelancer {
+  userId: number;
+  headline: string;
+  bio: string;
+  hourlyRateUsd: number;
+  matchScore: number;
+  skillMatches: string[];
+  reviewAvg: number;
+  reviewsCount: number;
+  deliveryScore: number;
+  githubUsername?: string;
+  websiteUrl?: string;
+  profilePictureUrl?: string;
+  matchReason?: string;
+  skills?: string[];
+}

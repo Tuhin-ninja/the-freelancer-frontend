@@ -914,7 +914,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
             </div>
 
             {/* Reviews Section - Only for FREELANCERs */}
-            {profileData?.role === 'FREELANCER' && (
+            {/* {profileData?.role === 'FREELANCER' && ( */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1035,7 +1035,7 @@ const UserProfilePage = ({ params }: { params: Promise<{ userId: string }> }) =>
                   </div>
                 )}
               </motion.div>
-            )}
+            {/* )} */}
 
             {/* Client Contracts Section */}
             {isOwnProfile && user?.role === 'CLIENT' && (

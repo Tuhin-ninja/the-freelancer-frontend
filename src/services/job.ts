@@ -443,6 +443,12 @@ export const jobAPI = {
   deleteJob: async (jobId: number): Promise<void> => {
     await jobProposalAPI.delete(`/api/jobs/my-jobs/${jobId}`);
   },
+
+  // Get matched freelancers for a job (Smart Matching)
+  getMatchedFreelancers: async (jobId: number): Promise<any> => {
+    const response = await jobProposalAPI.get(`/api/jobs/${jobId}/match-freelancers/smart`);
+    return response.data;
+  },
 };
 
 export const proposalAPI = {
